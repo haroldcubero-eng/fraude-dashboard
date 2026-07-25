@@ -1,0 +1,393 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente de Análisis de Fraude | OBS Business School</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Font Awesome para íconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+    <!-- ============================================ -->
+    <!-- HEADER SUPERIOR -->
+    <!-- ============================================ -->
+    <header class="top-header">
+        <div class="header-left">
+            <button id="menu-toggle" class="menu-toggle-btn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <img src="assets/obs-logo.png" alt="OBS Business School" class="header-logo">
+            <h1 class="header-title">Asistente de Análisis de Fraude</h1>
+        </div>
+        <div class="header-right">
+            <span class="system-status" id="system-status">
+                <i class="fas fa-circle status-dot"></i>
+                <span id="status-text">Conectando...</span>
+            </span>
+            <span class="user-info">
+                <i class="fas fa-user-shield"></i> Analista
+            </span>
+        </div>
+    </header>
+
+    <!-- ============================================ -->
+    <!-- LAYOUT PRINCIPAL: Sidebar + Contenido + Chat -->
+    <!-- ============================================ -->
+    <div class="main-layout">
+        
+        <!-- MENÚ LATERAL IZQUIERDO (colapsable) -->
+        <nav class="sidebar" id="sidebar">
+            <ul class="nav-menu">
+                <li class="nav-item active" data-section="dashboard">
+                    <i class="fas fa-chart-line"></i>
+                    <span class="nav-text">Dashboard</span>
+                </li>
+                <li class="nav-item" data-section="clasificar">
+                    <i class="fas fa-search-dollar"></i>
+                    <span class="nav-text">Clasificar Transacción</span>
+                </li>
+                <li class="nav-item" data-section="pendientes">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span class="nav-text">Pendientes</span>
+                </li>
+                <li class="nav-item" data-section="centinela">
+                    <i class="fas fa-shield-alt"></i>
+                    <span class="nav-text">Centinela</span>
+                </li>
+                <li class="nav-item" data-section="patrones">
+                    <i class="fas fa-project-diagram"></i>
+                    <span class="nav-text">Patrones</span>
+                </li>
+                <li class="nav-item" data-section="validaciones">
+                    <i class="fas fa-check-double"></i>
+                    <span class="nav-text">Validaciones</span>
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="model-health" id="model-health">
+                    <i class="fas fa-brain"></i>
+                    <span class="nav-text">Modelo: OK</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="content-area" id="content-area">
+            
+            <!-- ===== SECCIÓN: DASHBOARD ===== -->
+            <section class="section active" id="section-dashboard">
+                <!-- KPIs superiores -->
+                <div class="kpi-grid">
+                    <div class="kpi-card kpi-danger">
+                        <div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div class="kpi-data">
+                            <span class="kpi-value" id="kpi-pendientes">--</span>
+                            <span class="kpi-label">Alertas Pendientes</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card kpi-warning">
+                        <div class="kpi-icon"><i class="fas fa-percentage"></i></div>
+                        <div class="kpi-data">
+                            <span class="kpi-value" id="kpi-tasa-fraude">--</span>
+                            <span class="kpi-label">Tasa de Fraude (24h)</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card kpi-success">
+                        <div class="kpi-icon"><i class="fas fa-exchange-alt"></i></div>
+                        <div class="kpi-data">
+                            <span class="kpi-value" id="kpi-total">--</span>
+                            <span class="kpi-label">Transacciones Totales</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card kpi-alert">
+                        <div class="kpi-icon"><i class="fas fa-satellite-dish"></i></div>
+                        <div class="kpi-data">
+                            <span class="kpi-value" id="kpi-centinela">--</span>
+                            <span class="kpi-label">Campañas Centinela</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Indicador de reentrenamiento -->
+                <div class="retrain-indicator" id="retrain-indicator">
+                    <div class="retrain-content">
+                        <i class="fas fa-brain"></i>
+                        <div class="retrain-info">
+                            <span class="retrain-title">Estado del Modelo</span>
+                            <span class="retrain-detail" id="retrain-detail">Evaluando...</span>
+                        </div>
+                    </div>
+                    <div class="retrain-bar">
+                        <div class="retrain-progress" id="retrain-progress"></div>
+                    </div>
+                </div>
+
+                <!-- Gráficos -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3 class="chart-title">Distribución por Nivel de Riesgo</h3>
+                        <canvas id="chart-riesgo"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3 class="chart-title">Alertas por Hora (últimas 24h)</h3>
+                        <canvas id="chart-temporal"></canvas>
+                    </div>
+                </div>
+
+                <!-- Tabla resumen últimas alertas -->
+                <div class="table-card">
+                    <h3 class="table-title">Últimas Alertas de Fraude</h3>
+                    <table class="data-table" id="table-alertas">
+                        <thead>
+                            <tr>
+                                <th>ID Transacción</th>
+                                <th>Monto</th>
+                                <th>Probabilidad</th>
+                                <th>Nivel</th>
+                                <th>Estado</th>
+                                <th>Hora</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertas-body">
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: CLASIFICAR TRANSACCIÓN ===== -->
+            <section class="section" id="section-clasificar">
+                <h2 class="section-title"><i class="fas fa-search-dollar"></i> Clasificar Nueva Transacción</h2>
+                <p class="section-desc">Ingrese los datos de la transacción para obtener la predicción del modelo XGBoost.</p>
+                
+                <form class="predict-form" id="predict-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="TransactionAmt">Monto de Transacción ($)</label>
+                            <input type="number" id="TransactionAmt" name="TransactionAmt" step="0.01" required placeholder="Ej: 125.50">
+                        </div>
+                        <div class="form-group">
+                            <label for="ProductCD">Código de Producto</label>
+                            <select id="ProductCD" name="ProductCD" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="W">W - Web</option>
+                                <option value="C">C - Cargo</option>
+                                <option value="R">R - Recurrente</option>
+                                <option value="H">H - Hotel</option>
+                                <option value="S">S - Servicio</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="card4">Tipo de Tarjeta (card4)</label>
+                            <select id="card4" name="card4" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="visa">Visa</option>
+                                <option value="mastercard">Mastercard</option>
+                                <option value="american express">American Express</option>
+                                <option value="discover">Discover</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="card6">Categoría de Tarjeta (card6)</label>
+                            <select id="card6" name="card6" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="debit">Débito</option>
+                                <option value="credit">Crédito</option>
+                                <option value="debit or credit">Débito o Crédito</option>
+                                <option value="charge card">Charge Card</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="addr1">Código de Dirección (addr1)</label>
+                            <input type="number" id="addr1" name="addr1" required placeholder="Ej: 315">
+                        </div>
+                        <div class="form-group">
+                            <label for="P_emaildomain">Dominio de Email</label>
+                            <select id="P_emaildomain" name="P_emaildomain" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="gmail.com">gmail.com</option>
+                                <option value="yahoo.com">yahoo.com</option>
+                                <option value="hotmail.com">hotmail.com</option>
+                                <option value="outlook.com">outlook.com</option>
+                                <option value="aol.com">aol.com</option>
+                                <option value="anonymous.com">anonymous.com</option>
+                                <option value="protonmail.com">protonmail.com</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="DeviceType">Tipo de Dispositivo</label>
+                            <select id="DeviceType" name="DeviceType" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="desktop">Desktop</option>
+                                <option value="mobile">Mobile</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="hour">Hora de Transacción</label>
+                            <input type="number" id="hour" name="hour" min="0" max="23" required placeholder="0-23">
+                        </div>
+                        <div class="form-group">
+                            <label for="day_of_week">Día de la Semana</label>
+                            <select id="day_of_week" name="day_of_week" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="0">Lunes</option>
+                                <option value="1">Martes</option>
+                                <option value="2">Miércoles</option>
+                                <option value="3">Jueves</option>
+                                <option value="4">Viernes</option>
+                                <option value="5">Sábado</option>
+                                <option value="6">Domingo</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-predict">
+                        <i class="fas fa-robot"></i> Clasificar Transacción
+                    </button>
+                </form>
+
+                <!-- Resultado de predicción -->
+                <div class="prediction-result hidden" id="prediction-result">
+                    <div class="result-header" id="result-header">
+                        <span class="result-icon" id="result-icon"></span>
+                        <span class="result-level" id="result-level"></span>
+                        <span class="result-prob" id="result-prob"></span>
+                    </div>
+                    <div class="result-explanation" id="result-explanation"></div>
+                    <div class="result-actions" id="result-actions"></div>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: PENDIENTES ===== -->
+            <section class="section" id="section-pendientes">
+                <h2 class="section-title"><i class="fas fa-clipboard-list"></i> Transacciones Pendientes de Validación</h2>
+                <p class="section-desc">Transacciones clasificadas como fraude por el modelo, pendientes de revisión humana.</p>
+                <button class="btn-refresh" id="btn-refresh-pendientes">
+                    <i class="fas fa-sync-alt"></i> Actualizar
+                </button>
+                <div class="table-card">
+                    <table class="data-table" id="table-pendientes">
+                        <thead>
+                            <tr>
+                                <th>ID Transacción</th>
+                                <th>Monto</th>
+                                <th>Probabilidad</th>
+                                <th>Nivel Riesgo</th>
+                                <th>Hora</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendientes-body">
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: CENTINELA ===== -->
+            <section class="section" id="section-centinela">
+                <h2 class="section-title"><i class="fas fa-shield-alt"></i> Alertas Centinela</h2>
+                <p class="section-desc">Campañas coordinadas de fraude detectadas en las últimas 6 horas.</p>
+                <button class="btn-refresh" id="btn-refresh-centinela">
+                    <i class="fas fa-sync-alt"></i> Actualizar
+                </button>
+                <div class="table-card">
+                    <table class="data-table" id="table-centinela">
+                        <thead>
+                            <tr>
+                                <th>Campaña</th>
+                                <th>Tarjetas Afectadas</th>
+                                <th>Ubicación</th>
+                                <th>Detectada</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="centinela-body">
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: PATRONES ===== -->
+            <section class="section" id="section-patrones">
+                <h2 class="section-title"><i class="fas fa-project-diagram"></i> Análisis de Patrones</h2>
+                <p class="section-desc">Tendencias y concentraciones detectadas en transacciones recientes.</p>
+                <button class="btn-analyze" id="btn-analyze-patrones">
+                    <i class="fas fa-chart-bar"></i> Ejecutar Análisis
+                </button>
+                <div class="patrones-result" id="patrones-result">
+                    <!-- Se llena dinámicamente con el análisis -->
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: VALIDACIONES ===== -->
+            <section class="section" id="section-validaciones">
+                <h2 class="section-title"><i class="fas fa-check-double"></i> Historial de Validaciones</h2>
+                <p class="section-desc">Registro de decisiones del analista y métricas de acuerdo con el modelo.</p>
+                <div class="validation-stats" id="validation-stats">
+                    <!-- Métricas de validación -->
+                </div>
+                <div class="table-card">
+                    <table class="data-table" id="table-validaciones">
+                        <thead>
+                            <tr>
+                                <th>ID Transacción</th>
+                                <th>Predicción Modelo</th>
+                                <th>Decisión Analista</th>
+                                <th>Resultado</th>
+                                <th>Peso Reentrenamiento</th>
+                                <th>Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody id="validaciones-body">
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- PANEL DE CHAT (lateral derecho, siempre visible) -->
+        <aside class="chat-panel" id="chat-panel">
+            <div class="chat-header">
+                <h3><i class="fas fa-robot"></i> Agente IA</h3>
+                <button class="chat-minimize" id="chat-minimize">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="chat-message bot">
+                    <div class="message-content">
+                        ¡Hola! Soy el Asistente de Análisis de Fraude. ¿En qué puedo ayudarte hoy?
+                    </div>
+                    <div class="message-buttons">
+                        <button class="action-btn" data-command="mostrar resumen general del sistema">📊 Ver estado del sistema</button>
+                        <button class="action-btn" data-command="consultar pendientes">📋 Revisar alertas pendientes</button>
+                        <button class="action-btn" data-command="iniciar clasificación de transacción">🔍 Clasificar transacción</button>
+                        <button class="action-btn" data-command="consultar alertas centinela activas">🚨 Ver alertas centinela</button>
+                    </div>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Escribe un mensaje..." autocomplete="off">
+                <button id="chat-send" class="chat-send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/chat.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
+
