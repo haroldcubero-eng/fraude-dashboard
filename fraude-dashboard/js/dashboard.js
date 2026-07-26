@@ -123,7 +123,7 @@ const Dashboard = {
             document.getElementById('kpi-pendientes').textContent = data.total || data.transacciones.length;
 
         } else {
-            const html = `<tr><td colspan="6"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
+            const html = `<tr><td colspan="7"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
             if (alertasBody) alertasBody.innerHTML = html;
             if (pendientesBody) pendientesBody.innerHTML = html;
         }
