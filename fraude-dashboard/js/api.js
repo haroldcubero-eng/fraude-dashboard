@@ -111,9 +111,9 @@ const API = {
     },
 
     // NUEVO: Datos para gráficos
-    async getGraficos() {
-        return await this.sendMessage('[DASHBOARD] graficos');
-    },
+    //async getGraficos() {
+    //    return await this.sendMessage('[DASHBOARD] graficos');
+    //},
 
     // =============================================
     // MÉTODOS CONVERSACIONALES — Sin prefijo
