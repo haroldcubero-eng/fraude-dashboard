@@ -54,9 +54,10 @@ const Dashboard = {
             this.processCentinelaResponse(centResponse.message);
         }
     },
-
+    
     // =============================================
     // Procesar respuesta del resumen general
+    // Ahora incluye datos para los gráficos
     // =============================================
     processDashboardResponse(responseText) {
         let data = this.tryParseJSON(responseText);
@@ -78,11 +79,19 @@ const Dashboard = {
                 this.updateRetrainIndicator(data.desacuerdos, data.estado_modelo);
             }
             this.updateModelHealth(data.estado_modelo);
+
+            // *** GRÁFICOS desde el resumen general ***
+            if (data.distribucion_riesgo) {
+                this.renderRiskChart(data.distribucion_riesgo);
+            }
+            if (data.alertas_por_hora && Array.isArray(data.alertas_por_hora) && data.alertas_por_hora.length > 0) {
+                this.renderHourlyChart(data.alertas_por_hora);
+            }
         } else {
             this.extractMetricsFromText(responseText);
         }
     },
-
+ 
     // =============================================
     // Procesar respuesta de pendientes
     // Llena tabla + calcula gráficos
