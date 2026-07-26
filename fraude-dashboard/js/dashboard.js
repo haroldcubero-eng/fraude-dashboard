@@ -2,7 +2,7 @@
 /* ============================================
    DASHBOARD.JS — Métricas, gráficos y tablas
    Los datos se obtienen enviando mensajes a n8n
-   y parseando las respuestas del agente.
+   con prefijo [DASHBOARD] para recibir JSON.
    ============================================ */
 
 const Dashboard = {
@@ -16,7 +16,7 @@ const Dashboard = {
         this.setupRefreshButtons();
         this.setupPredictForm();
 
-        // CARGA AUTOMÁTICA: Solicitar datos al iniciar
+        // CARGA AUTOMÁTICA al iniciar
         this.autoLoadData();
 
         // Auto-refresh cada 5 minutos
@@ -27,166 +27,218 @@ const Dashboard = {
 
     // =============================================
     // Carga automática de datos al iniciar
-    // Hace las peticiones necesarias a n8n
     // =============================================
     async autoLoadData() {
-        // Actualizar estado de conexión
         document.getElementById('status-text').textContent = 'Conectando...';
 
-        // 1. Solicitar resumen general (para KPIs)
+        // 1. Resumen general (KPIs)
         const dashResponse = await API.getDashboardData();
         if (dashResponse.success) {
-            this.parseDashboardResponse(dashResponse.message);
+            this.processDashboardResponse(dashResponse.message);
             document.getElementById('status-text').textContent = 'Sistema Operativo';
             document.querySelector('.status-dot').classList.remove('offline');
         } else {
             this.setOfflineState();
-            return; // Si no hay conexión, no seguir pidiendo datos
+            return;
         }
 
-        // 2. Solicitar pendientes (para tabla de alertas y KPI)
+        // 2. Pendientes (tabla de alertas)
         const pendResponse = await API.getPendientes();
         if (pendResponse.success) {
-            this.parsePendientesResponse(pendResponse.message);
+            this.processPendientesResponse(pendResponse.message);
         }
 
-        // 3. Solicitar alertas centinela
+        // 3. Centinela
         const centResponse = await API.getCentinela();
         if (centResponse.success) {
-            this.parseCentinelaResponse(centResponse.message);
+            this.processCentinelaResponse(centResponse.message);
         }
     },
 
     // =============================================
-    // Parsear respuesta del dashboard para KPIs
+    // Procesar respuesta del resumen general
+    // Intenta parsear como JSON, si falla usa regex
     // =============================================
-    parseDashboardResponse(responseText) {
-        const metrics = this.extractMetrics(responseText);
-        
-        if (metrics.pendientes !== null) {
-            document.getElementById('kpi-pendientes').textContent = metrics.pendientes;
-        }
-        if (metrics.tasaFraude !== null) {
-            document.getElementById('kpi-tasa-fraude').textContent = metrics.tasaFraude + '%';
-        }
-        if (metrics.totalTransacciones !== null) {
-            document.getElementById('kpi-total').textContent = metrics.totalTransacciones;
-        }
-        if (metrics.centinela !== null) {
-            document.getElementById('kpi-centinela').textContent = metrics.centinela;
-        }
+    processDashboardResponse(responseText) {
+        let data = this.tryParseJSON(responseText);
 
-        // Actualizar indicador de reentrenamiento
-        this.updateRetrainIndicator(metrics.desacuerdos);
-
-        // Mostrar la respuesta completa en el área de patrones como contexto
-        this.updateDashboardSummary(responseText);
+        if (data) {
+            // Respuesta JSON estructurada
+            if (data.pendientes !== undefined) {
+                document.getElementById('kpi-pendientes').textContent = data.pendientes;
+            }
+            if (data.tasa_fraude !== undefined) {
+                document.getElementById('kpi-tasa-fraude').textContent = data.tasa_fraude + '%';
+            }
+            if (data.total_transacciones !== undefined) {
+                document.getElementById('kpi-total').textContent = data.total_transacciones;
+            }
+            if (data.centinela !== undefined) {
+                document.getElementById('kpi-centinela').textContent = data.centinela;
+            }
+            if (data.desacuerdos !== undefined) {
+                this.updateRetrainIndicator(data.desacuerdos, data.estado_modelo);
+            }
+            // Actualizar modelo health
+            this.updateModelHealth(data.estado_modelo);
+        } else {
+            // Fallback: extraer métricas del texto con regex
+            this.extractMetricsFromText(responseText);
+        }
     },
 
     // =============================================
-    // Parsear respuesta de pendientes
-    // Llena la tabla de alertas y la sección pendientes
+    // Procesar respuesta de pendientes
     // =============================================
-    parsePendientesResponse(responseText) {
-        // Actualizar tabla en sección Dashboard (últimas alertas)
+    processPendientesResponse(responseText) {
+        let data = this.tryParseJSON(responseText);
+
         const alertasBody = document.getElementById('alertas-body');
-        if (alertasBody) {
-            alertasBody.innerHTML = `<tr><td colspan="6"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
-        }
-
-        // Actualizar tabla en sección Pendientes
         const pendientesBody = document.getElementById('pendientes-body');
-        if (pendientesBody) {
-            pendientesBody.innerHTML = `<tr><td colspan="6"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
-        }
 
-        // Intentar extraer conteo de pendientes para KPI
-        const countMatch = responseText.match(/(\d+)\s*(transacciones?|alertas?)\s*(pendientes?)/i);
-        if (countMatch) {
-            document.getElementById('kpi-pendientes').textContent = countMatch[1];
+        if (data && data.transacciones && Array.isArray(data.transacciones)) {
+            // JSON estructurado — llenar tablas
+            const rows = data.transacciones.map(t => `
+                <tr>
+                    <td><strong>${t.transaction_id}</strong></td>
+                    <td>$${parseFloat(t.transaction_amt).toFixed(2)}</td>
+                    <td>${(t.probabilidad_fraude * 100).toFixed(1)}%</td>
+                    <td><span class="badge badge-${this.getBadgeClass(t.nivel_riesgo)}">${t.nivel_riesgo}</span></td>
+                    <td><span class="badge badge-pending">PENDIENTE</span></td>
+                    <td>
+                        <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'fraude')">✅ Fraude</button>
+                        <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'legitima')">❌ Legítima</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            if (alertasBody) alertasBody.innerHTML = rows;
+            if (pendientesBody) pendientesBody.innerHTML = rows;
+
+            // Actualizar KPI
+            document.getElementById('kpi-pendientes').textContent = data.total || data.transacciones.length;
+        } else {
+            // Fallback: mostrar texto formateado
+            const html = `<tr><td colspan="6"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
+            if (alertasBody) alertasBody.innerHTML = html;
+            if (pendientesBody) pendientesBody.innerHTML = html;
         }
     },
 
     // =============================================
-    // Parsear respuesta de centinela
+    // Procesar respuesta de centinela
     // =============================================
-    parseCentinelaResponse(responseText) {
-        // Actualizar tabla centinela
+    processCentinelaResponse(responseText) {
+        let data = this.tryParseJSON(responseText);
+
         const centinelaBody = document.getElementById('centinela-body');
-        if (centinelaBody) {
-            centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
-        }
 
-        // Intentar extraer conteo para KPI
-        const countMatch = responseText.match(/(\d+)\s*(campañas?|alertas?\s*centinela)/i);
-        if (countMatch) {
-            document.getElementById('kpi-centinela').textContent = countMatch[1];
+        if (data && data.alertas && Array.isArray(data.alertas)) {
+            // JSON estructurado
+            const rows = data.alertas.map(a => `
+                <tr>
+                    <td><strong>${a.tipo_alerta}</strong></td>
+                    <td>${a.tarjetas_distintas}</td>
+                    <td>${a.valor_compartido}</td>
+                    <td>${a.primera_deteccion}</td>
+                    <td><span class="badge badge-critical">${a.estado ? a.estado.toUpperCase() : 'ACTIVA'}</span></td>
+                </tr>
+            `).join('');
+
+            if (centinelaBody) centinelaBody.innerHTML = rows;
+            document.getElementById('kpi-centinela').textContent = data.total || data.alertas.length;
+        } else if (data && data.total === 0) {
+            // Sin alertas centinela
+            if (centinelaBody) {
+                centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">✅ No hay campañas centinela activas en este momento.</div></td></tr>`;
+            }
+            document.getElementById('kpi-centinela').textContent = '0';
+        } else {
+            // Fallback: texto
+            if (centinelaBody) {
+                centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
+            }
         }
     },
 
     // =============================================
-    // Mostrar resumen del dashboard
+    // Validar desde la tabla (botones de acción)
     // =============================================
-    updateDashboardSummary(responseText) {
-        // Si hay información del estado general, mostrarla
-        const cleanText = this.formatResponseAsHtml(responseText);
-        
-        // Actualizar el modelo health en el sidebar
-        const modelHealth = document.getElementById('model-health');
-        if (responseText.toLowerCase().includes('operativo') || responseText.toLowerCase().includes('estable') || responseText.toLowerCase().includes('ok')) {
-            modelHealth.innerHTML = '<i class="fas fa-brain"></i><span class="nav-text">Modelo: OK</span>';
-            modelHealth.style.color = '#10b981';
-        }
+    validarDesdeTabla(transactionId, decision) {
+        // Enviar al chat para que siga el flujo conversacional
+        Chat.sendUserMessage(`validar transacción ${transactionId} como ${decision}`);
     },
 
     // =============================================
-    // Extraer números/métricas del texto del agente
+    // Intentar parsear JSON de la respuesta
+    // El agente puede devolver JSON puro o JSON
+    // envuelto en texto/markdown
     // =============================================
-    extractMetrics(text) {
-        const metrics = {
-            pendientes: null,
-            tasaFraude: null,
-            totalTransacciones: null,
-            centinela: null,
-            desacuerdos: null
-        };
+    tryParseJSON(text) {
+        if (!text) return null;
 
-        // Pendientes
+        // Intento 1: parsear directamente
+        try {
+            return JSON.parse(text);
+        } catch (e) {}
+
+        // Intento 2: buscar JSON dentro de bloques de código ```json ... ```
+        const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlockMatch) {
+            try {
+                return JSON.parse(codeBlockMatch[1].trim());
+            } catch (e) {}
+        }
+
+        // Intento 3: buscar el primer { ... } o [ ... ] en el texto
+        const jsonMatch = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+        if (jsonMatch) {
+            try {
+                return JSON.parse(jsonMatch[1]);
+            } catch (e) {}
+        }
+
+        return null;
+    },
+
+    // =============================================
+    // Fallback: extraer métricas del texto con regex
+    // =============================================
+    extractMetricsFromText(text) {
         const pendMatch = text.match(/(\d+)\s*(alertas?\s*pendientes?|transacciones?\s*pendientes?|pendientes?)/i);
-        if (pendMatch) metrics.pendientes = parseInt(pendMatch[1]);
+        if (pendMatch) document.getElementById('kpi-pendientes').textContent = parseInt(pendMatch[1]);
 
-        // Tasa de fraude
         const tasaMatch = text.match(/tasa.*?(\d+[.,]?\d*)\s*%/i) || text.match(/(\d+[.,]?\d*)\s*%.*?fraude/i);
-        if (tasaMatch) metrics.tasaFraude = parseFloat(tasaMatch[1].replace(',', '.'));
+        if (tasaMatch) document.getElementById('kpi-tasa-fraude').textContent = parseFloat(tasaMatch[1].replace(',', '.')) + '%';
 
-        // Total transacciones
         const totalMatch = text.match(/(\d+)\s*transacciones?\s*totales?/i) || text.match(/total.*?(\d+)\s*transacciones?/i);
-        if (totalMatch) metrics.totalTransacciones = parseInt(totalMatch[1]);
+        if (totalMatch) document.getElementById('kpi-total').textContent = parseInt(totalMatch[1]);
 
-        // Centinela
         const centMatch = text.match(/(\d+)\s*(campañas?|alertas?\s*centinela)/i);
-        if (centMatch) metrics.centinela = parseInt(centMatch[1]);
+        if (centMatch) document.getElementById('kpi-centinela').textContent = parseInt(centMatch[1]);
 
-        // Desacuerdos para reentrenamiento
-        const desMatch = text.match(/(\d+)\s*(desacuerdos?|FP|FN)/i) || text.match(/(\d+)\/\d+\s*desacuerdos?/i);
-        if (desMatch) metrics.desacuerdos = parseInt(desMatch[1]);
-
-        return metrics;
+        const desMatch = text.match(/(\d+)\s*(desacuerdos?|FP|FN)/i);
+        if (desMatch) this.updateRetrainIndicator(parseInt(desMatch[1]), null);
     },
 
     // =============================================
     // Indicador de reentrenamiento
     // =============================================
-    updateRetrainIndicator(desacuerdos) {
+    updateRetrainIndicator(desacuerdos, estadoModelo) {
         const indicator = document.getElementById('retrain-indicator');
         const detail = document.getElementById('retrain-detail');
         const progress = document.getElementById('retrain-progress');
         
         const umbral = 10;
-        
-        if (desacuerdos === null) {
-            detail.textContent = 'Evaluando estado del modelo...';
-            progress.style.width = '0%';
+
+        if (desacuerdos === null || desacuerdos === undefined) {
+            // Si no hay dato de desacuerdos pero hay estado del modelo
+            if (estadoModelo) {
+                this.setRetrainByStatus(estadoModelo, detail, progress, indicator);
+            } else {
+                detail.textContent = 'Evaluando estado del modelo...';
+                progress.style.width = '0%';
+            }
             return;
         }
 
@@ -208,39 +260,118 @@ const Dashboard = {
         }
     },
 
+    // Establecer estado por texto del modelo
+    setRetrainByStatus(estado, detail, progress, indicator) {
+        switch(estado) {
+            case 'reentrenamiento':
+                indicator.className = 'retrain-indicator critical';
+                detail.textContent = '⚠️ SE RECOMIENDA REENTRENAMIENTO';
+                progress.style.width = '100%';
+                progress.style.background = '#dc2626';
+                break;
+            case 'observacion':
+                indicator.className = 'retrain-indicator warning';
+                detail.textContent = 'Modelo en observación';
+                progress.style.width = '70%';
+                progress.style.background = '#f59e0b';
+                break;
+            default:
+                indicator.className = 'retrain-indicator';
+                detail.textContent = 'Modelo estable ✓';
+                progress.style.width = '30%';
+                progress.style.background = '#10b981';
+        }
+    },
+
+    // =============================================
+    // Actualizar estado del modelo en sidebar
+    // =============================================
+    updateModelHealth(estado) {
+        const modelHealth = document.getElementById('model-health');
+        if (!modelHealth) return;
+
+        if (estado === 'reentrenamiento') {
+            modelHealth.innerHTML = '<i class="fas fa-brain"></i><span class="nav-text">Modelo: Reentrenar</span>';
+            modelHealth.style.color = '#dc2626';
+        } else if (estado === 'observacion') {
+            modelHealth.innerHTML = '<i class="fas fa-brain"></i><span class="nav-text">Modelo: Observación</span>';
+            modelHealth.style.color = '#f59e0b';
+        } else {
+            modelHealth.innerHTML = '<i class="fas fa-brain"></i><span class="nav-text">Modelo: OK</span>';
+            modelHealth.style.color = '#10b981';
+        }
+    },
+
     // =============================================
     // Actualizar secciones desde respuesta del chat
     // =============================================
     updateFromChatResponse(section, responseText) {
         switch(section) {
             case 'pendientes':
-                this.parsePendientesResponse(responseText);
+                this.processPendientesResponse(responseText);
                 break;
             case 'centinela':
-                this.parseCentinelaResponse(responseText);
+                this.processCentinelaResponse(responseText);
                 break;
             case 'patrones':
-                document.getElementById('patrones-result').innerHTML = `
-                    <div class="chart-card">
-                        <div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div>
-                    </div>
-                `;
+                this.processPatternsResponse(responseText);
                 break;
             case 'dashboard':
-                this.parseDashboardResponse(responseText);
+                this.processDashboardResponse(responseText);
                 break;
         }
     },
 
     // =============================================
-    // Formatear respuesta del agente como HTML
+    // Procesar respuesta de patrones
+    // =============================================
+    processPatternsResponse(responseText) {
+        let data = this.tryParseJSON(responseText);
+        const container = document.getElementById('patrones-result');
+        if (!container) return;
+
+        if (data) {
+            container.innerHTML = `
+                <div class="chart-card">
+                    <h4>📈 Análisis de Patrones</h4>
+                    <p><strong>Total alertas analizadas:</strong> ${data.total_alertas || 'N/A'}</p>
+                    <p><strong>Concentración horaria:</strong> ${data.concentracion_horaria || 'N/A'}</p>
+                    <p><strong>Tendencia:</strong> ${data.tendencia || 'N/A'}</p>
+                    <p><strong>Campañas centinela activas:</strong> ${data.centinela_activas || 0}</p>
+                    <h4>🧠 Hipótesis</h4>
+                    <p>${data.hipotesis || 'Sin hipótesis disponible'}</p>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="chart-card">
+                    <div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div>
+                </div>
+            `;
+        }
+    },
+
+    // =============================================
+    // Obtener clase CSS para badge de riesgo
+    // =============================================
+    getBadgeClass(nivel) {
+        if (!nivel) return 'medium';
+        const n = nivel.toUpperCase().replace('Í', 'I');
+        switch(n) {
+            case 'CRITICO': return 'critical';
+            case 'ALTO': return 'high';
+            case 'MEDIO': return 'medium';
+            case 'BAJO': return 'low';
+            default: return 'medium';
+        }
+    },
+
+    // =============================================
+    // Formatear respuesta como HTML (fallback)
     // =============================================
     formatResponseAsHtml(text) {
         if (!text) return '<em>Sin datos disponibles</em>';
-        
-        // Remover bloque [BUTTONS] si existe
         text = text.replace(/\[BUTTONS\][\s\S]*?\[\/BUTTONS\]/, '').trim();
-        
         return text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -253,52 +384,37 @@ const Dashboard = {
     // Configurar botones de refresh
     // =============================================
     setupRefreshButtons() {
-        // Botón refresh pendientes
         const btnPendientes = document.getElementById('btn-refresh-pendientes');
         if (btnPendientes) {
             btnPendientes.addEventListener('click', async () => {
                 btnPendientes.disabled = true;
                 btnPendientes.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
-                
                 const response = await API.getPendientes();
-                if (response.success) {
-                    this.parsePendientesResponse(response.message);
-                }
-                
+                if (response.success) this.processPendientesResponse(response.message);
                 btnPendientes.disabled = false;
                 btnPendientes.innerHTML = '<i class="fas fa-sync-alt"></i> Actualizar';
             });
         }
 
-        // Botón refresh centinela
         const btnCentinela = document.getElementById('btn-refresh-centinela');
         if (btnCentinela) {
             btnCentinela.addEventListener('click', async () => {
                 btnCentinela.disabled = true;
                 btnCentinela.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
-                
                 const response = await API.getCentinela();
-                if (response.success) {
-                    this.parseCentinelaResponse(response.message);
-                }
-                
+                if (response.success) this.processCentinelaResponse(response.message);
                 btnCentinela.disabled = false;
                 btnCentinela.innerHTML = '<i class="fas fa-sync-alt"></i> Actualizar';
             });
         }
 
-        // Botón analizar patrones
         const btnPatrones = document.getElementById('btn-analyze-patrones');
         if (btnPatrones) {
             btnPatrones.addEventListener('click', async () => {
                 btnPatrones.disabled = true;
                 btnPatrones.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analizando...';
-                
                 const response = await API.analizarPatrones();
-                if (response.success) {
-                    this.updateFromChatResponse('patrones', response.message);
-                }
-                
+                if (response.success) this.processPatternsResponse(response.message);
                 btnPatrones.disabled = false;
                 btnPatrones.innerHTML = '<i class="fas fa-chart-bar"></i> Ejecutar Análisis';
             });
@@ -317,9 +433,7 @@ const Dashboard = {
 
             const formData = new FormData(form);
             const datos = {};
-            formData.forEach((value, key) => {
-                datos[key] = value;
-            });
+            formData.forEach((value, key) => { datos[key] = value; });
 
             const submitBtn = form.querySelector('.btn-predict');
             submitBtn.disabled = true;
@@ -339,7 +453,6 @@ const Dashboard = {
 
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-robot"></i> Clasificar Transacción';
-
             resultDiv.scrollIntoView({ behavior: 'smooth' });
         });
     },
@@ -357,16 +470,11 @@ const Dashboard = {
         let icon = '🔍';
         let color = 'var(--text-primary)';
         
-        switch(nivel) {
-            case 'CRÍTICO':
-            case 'CRITICO':
-                icon = '🚨'; color = 'var(--risk-critical)'; break;
-            case 'ALTO':
-                icon = '⚠️'; color = 'var(--risk-high)'; break;
-            case 'MEDIO':
-                icon = '⚡'; color = 'var(--risk-medium)'; break;
-            case 'BAJO':
-                icon = '✅'; color = 'var(--risk-low)'; break;
+        switch(nivel.replace('Í', 'I')) {
+            case 'CRITICO': icon = '🚨'; color = 'var(--risk-critical)'; break;
+            case 'ALTO': icon = '⚠️'; color = 'var(--risk-high)'; break;
+            case 'MEDIO': icon = '⚡'; color = 'var(--risk-medium)'; break;
+            case 'BAJO': icon = '✅'; color = 'var(--risk-low)'; break;
         }
 
         document.getElementById('result-icon').textContent = icon;
@@ -383,7 +491,6 @@ const Dashboard = {
             actionsDiv.innerHTML = parsed.buttons.map(btn => 
                 `<button class="action-btn" data-command="${btn.command}">${btn.label}</button>`
             ).join('');
-
             actionsDiv.querySelectorAll('.action-btn').forEach(btnEl => {
                 btnEl.addEventListener('click', () => {
                     Chat.sendUserMessage(btnEl.getAttribute('data-command'));
@@ -398,8 +505,11 @@ const Dashboard = {
     setOfflineState() {
         document.getElementById('status-text').textContent = 'Sin conexión';
         document.querySelector('.status-dot').classList.add('offline');
-        document.getElementById('model-health').innerHTML = '<i class="fas fa-brain"></i><span class="nav-text">Modelo: Offline</span>';
-        document.getElementById('model-health').style.color = '#ef4444';
+        const modelHealth = document.getElementById('model-health');
+        if (modelHealth) {
+            modelHealth.innerHTML = '<i class="fas fa-brain"></i><span class="nav-text">Modelo: Offline</span>';
+            modelHealth.style.color = '#ef4444';
+        }
     }
 };
 
