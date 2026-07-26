@@ -1,8 +1,8 @@
 
 /* ============================================
-   DASHBOARD.JS — Versión completa con gráficos
-   Incluye Chart.js para distribución de riesgo
-   y alertas por hora.
+   DASHBOARD.JS — Métricas, gráficos y tablas
+   Los gráficos se calculan desde los datos de
+   pendientes (sin petición extra a n8n).
    ============================================ */
 
 const Dashboard = {
@@ -42,7 +42,7 @@ const Dashboard = {
             return;
         }
 
-        // 2. Pendientes (tabla de alertas)
+        // 2. Pendientes (tabla de alertas + gráficos)
         const pendResponse = await API.getPendientes();
         if (pendResponse.success) {
             this.processPendientesResponse(pendResponse.message);
@@ -52,12 +52,6 @@ const Dashboard = {
         const centResponse = await API.getCentinela();
         if (centResponse.success) {
             this.processCentinelaResponse(centResponse.message);
-        }
-
-        // 4. Gráficos
-        const grafResponse = await API.getGraficos();
-        if (grafResponse.success) {
-            this.processGraficosResponse(grafResponse.message);
         }
     },
 
@@ -91,6 +85,7 @@ const Dashboard = {
 
     // =============================================
     // Procesar respuesta de pendientes
+    // Llena tabla + calcula gráficos
     // =============================================
     processPendientesResponse(responseText) {
         let data = this.tryParseJSON(responseText);
@@ -116,6 +111,10 @@ const Dashboard = {
             if (alertasBody) alertasBody.innerHTML = rows;
             if (pendientesBody) pendientesBody.innerHTML = rows;
             document.getElementById('kpi-pendientes').textContent = data.total || data.transacciones.length;
+
+            // *** CALCULAR Y RENDERIZAR GRÁFICOS ***
+            this.calcularYRenderizarGraficos(data.transacciones);
+
         } else {
             const html = `<tr><td colspan="6"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
             if (alertasBody) alertasBody.innerHTML = html;
@@ -124,126 +123,65 @@ const Dashboard = {
     },
 
     // =============================================
-    // Procesar respuesta de centinela
+    // CALCULAR GRÁFICOS desde datos de pendientes
     // =============================================
-    processCentinelaResponse(responseText) {
-        let data = this.tryParseJSON(responseText);
-        const centinelaBody = document.getElementById('centinela-body');
+    calcularYRenderizarGraficos(transacciones) {
+        // --- Gráfico 1: Distribución por nivel de riesgo ---
+        const distribucion = { 'CRITICO': 0, 'ALTO': 0, 'MEDIO': 0, 'BAJO': 0 };
 
-        if (data && data.alertas && Array.isArray(data.alertas)) {
-            const rows = data.alertas.map(a => `
-                <tr>
-                    <td><strong>${a.tipo_alerta}</strong></td>
-                    <td>${a.tarjetas_distintas}</td>
-                    <td>${a.valor_compartido}</td>
-                    <td>${a.primera_deteccion}</td>
-                    <td><span class="badge badge-critical">${a.estado ? a.estado.toUpperCase() : 'ACTIVA'}</span></td>
-                </tr>
-            `).join('');
-
-            if (centinelaBody) centinelaBody.innerHTML = rows;
-            document.getElementById('kpi-centinela').textContent = data.total || data.alertas.length;
-        } else if (data && data.total === 0) {
-            if (centinelaBody) {
-                centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">✅ No hay campañas centinela activas en este momento.</div></td></tr>`;
-            }
-            document.getElementById('kpi-centinela').textContent = '0';
-        } else {
-            if (centinelaBody) {
-                centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
-            }
-        }
-    },
-
-    // =============================================
-    // GRÁFICOS — Procesar respuesta y renderizar
-    // =============================================
-    processGraficosResponse(responseText) {
-        let data = this.tryParseJSON(responseText);
-
-        if (data) {
-            // Gráfico 1: Distribución por nivel de riesgo (Donut/Pie)
-            if (data.distribucion_riesgo) {
-                this.renderRiskChart(data.distribucion_riesgo);
-            }
-
-            // Gráfico 2: Alertas por hora (Bar chart)
-            if (data.alertas_por_hora) {
-                this.renderHourlyChart(data.alertas_por_hora);
-            }
-        } else {
-            // Fallback: intentar extraer datos del texto
-            this.setChartFallback();
-        }
-    },
-
-    // =============================================
-    // Renderizar gráfico de distribución de riesgo
-    // =============================================
-    renderRiskChart(distribucion) {
-        const canvas = document.getElementById('chart-riesgo');
-        if (!canvas) return;
-
-        // Destruir gráfico anterior si existe
-        if (this.charts.riesgo) {
-            this.charts.riesgo.destroy();
-        }
-
-        const labels = [];
-        const values = [];
-        const colors = [];
-
-        const colorMap = {
-            'CRITICO': '#dc2626',
-            'ALTO': '#f59e0b',
-            'MEDIO': '#3b82f6',
-            'BAJO': '#10b981'
-        };
-
-        // Construir datos del gráfico
-        Object.keys(distribucion).forEach(nivel => {
-            if (distribucion[nivel] > 0) {
-                labels.push(nivel);
-                values.push(distribucion[nivel]);
-                colors.push(colorMap[nivel] || '#6b7280');
+        transacciones.forEach(t => {
+            const nivel = (t.nivel_riesgo || '').toUpperCase().replace('Í', 'I');
+            if (distribucion.hasOwnProperty(nivel)) {
+                distribucion[nivel]++;
             }
         });
 
-        // Crear gráfico con Chart.js
-        const ctx = canvas.getContext('2d');
-        this.charts.riesgo = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: colors,
-                    borderColor: '#1a1f2e',
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            color: '#94a3b8',
-                            padding: 15,
-                            font: { size: 12 }
-                        }
-                    },
-                    title: {
-                        display: false
-                    }
-                },
-                cutout: '60%'
+        this.renderRiskChart(distribucion);
+
+        // --- Gráfico 2: Alertas por hora ---
+        // Intentar extraer hora del timestamp o transaction_id
+        const alertasPorHora = {};
+
+        transacciones.forEach(t => {
+            let hora = null;
+
+            // Intentar extraer hora del timestamp
+            if (t.timestamp) {
+                const date = new Date(t.timestamp);
+                if (!isNaN(date.getTime())) {
+                    hora = date.getHours().toString().padStart(2, '0') + ':00';
+                }
             }
+
+            // Si no hay timestamp, intentar con el campo hour
+            if (!hora && t.hour !== undefined) {
+                hora = t.hour.toString().padStart(2, '0') + ':00';
+            }
+
+            // Si no hay hora, usar "Sin hora"
+            if (!hora) {
+                hora = 'N/A';
+            }
+
+            alertasPorHora[hora] = (alertasPorHora[hora] || 0) + 1;
         });
+
+        // Convertir a array y ordenar por hora
+        const alertasArray = Object.keys(alertasPorHora)
+            .sort()
+            .map(hora => ({ hora: hora, cantidad: alertasPorHora[hora] }));
+
+        if (alertasArray.length > 0 && !(alertasArray.length === 1 && alertasArray[0].hora === 'N/A')) {
+            this.renderHourlyChart(alertasArray);
+        } else {
+            // Si no hay datos de hora, mostrar mensaje
+            const canvas = document.getElementById('chart-horas');
+            if (canvas) {
+                canvas.parentElement.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; height:100%; color:#94a3b8; text-align:center; padding:1rem;"><span>Sin datos horarios disponibles.<br>Los datos de hora se mostrarán cuando las transacciones incluyan timestamp.</span></div>';
+            }
+        }
     },
 
-    
     // =============================================
     // Renderizar gráfico de distribución de riesgo
     // =============================================
@@ -363,17 +301,34 @@ const Dashboard = {
     },
 
     // =============================================
-    // Fallback si no hay datos para gráficos
+    // Procesar respuesta de centinela
     // =============================================
-    setChartFallback() {
-        const riesgoContainer = document.getElementById('chart-riesgo');
-        const horasContainer = document.getElementById('chart-horas');
+    processCentinelaResponse(responseText) {
+        let data = this.tryParseJSON(responseText);
+        const centinelaBody = document.getElementById('centinela-body');
 
-        if (riesgoContainer && !this.charts.riesgo) {
-            riesgoContainer.parentElement.innerHTML = '<div class="result-explanation" style="text-align:center; padding: 2rem;"><i class="fas fa-chart-pie" style="font-size: 2rem; opacity: 0.3;"></i><br><br>Sin datos suficientes para el gráfico</div>';
-        }
-        if (horasContainer && !this.charts.horas) {
-            horasContainer.parentElement.innerHTML = '<div class="result-explanation" style="text-align:center; padding: 2rem;"><i class="fas fa-chart-bar" style="font-size: 2rem; opacity: 0.3;"></i><br><br>Sin datos suficientes para el gráfico</div>';
+        if (data && data.alertas && Array.isArray(data.alertas)) {
+            const rows = data.alertas.map(a => `
+                <tr>
+                    <td><strong>${a.tipo_alerta}</strong></td>
+                    <td>${a.tarjetas_distintas}</td>
+                    <td>${a.valor_compartido}</td>
+                    <td>${a.primera_deteccion}</td>
+                    <td><span class="badge badge-critical">${a.estado ? a.estado.toUpperCase() : 'ACTIVA'}</span></td>
+                </tr>
+            `).join('');
+
+            if (centinelaBody) centinelaBody.innerHTML = rows;
+            document.getElementById('kpi-centinela').textContent = data.total || data.alertas.length;
+        } else if (data && data.total === 0) {
+            if (centinelaBody) {
+                centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">✅ No hay campañas centinela activas en este momento.</div></td></tr>`;
+            }
+            document.getElementById('kpi-centinela').textContent = '0';
+        } else {
+            if (centinelaBody) {
+                centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
+            }
         }
     },
 
