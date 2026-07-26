@@ -243,6 +243,68 @@ const Dashboard = {
         });
     },
 
+    
+    // =============================================
+    // Renderizar gráfico de distribución de riesgo
+    // =============================================
+    renderRiskChart(distribucion) {
+        const canvas = document.getElementById('chart-riesgo');
+        if (!canvas) return;
+
+        // Destruir gráfico anterior si existe
+        if (this.charts.riesgo) {
+            this.charts.riesgo.destroy();
+        }
+
+        const labels = [];
+        const values = [];
+        const colors = [];
+
+        const colorMap = {
+            'CRITICO': '#dc2626',
+            'ALTO': '#f59e0b',
+            'MEDIO': '#3b82f6',
+            'BAJO': '#10b981'
+        };
+
+        Object.keys(distribucion).forEach(nivel => {
+            if (distribucion[nivel] > 0) {
+                labels.push(nivel);
+                values.push(distribucion[nivel]);
+                colors.push(colorMap[nivel] || '#6b7280');
+            }
+        });
+
+        const ctx = canvas.getContext('2d');
+        this.charts.riesgo = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: '#1a1f2e',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#94a3b8',
+                            padding: 15,
+                            font: { size: 12 }
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    },
+
     // =============================================
     // Renderizar gráfico de alertas por hora
     // =============================================
@@ -258,14 +320,13 @@ const Dashboard = {
         const labels = alertasPorHora.map(item => item.hora);
         const values = alertasPorHora.map(item => item.cantidad);
 
-        // Determinar colores por intensidad
         const maxVal = Math.max(...values);
         const colors = values.map(v => {
-            const ratio = v / maxVal;
-            if (ratio > 0.75) return '#dc2626';      // Rojo — alta concentración
-            if (ratio > 0.5) return '#f59e0b';       // Amarillo — media
-            if (ratio > 0.25) return '#3b82f6';      // Azul — baja
-            return '#10b981';                         // Verde — mínima
+            const ratio = maxVal > 0 ? v / maxVal : 0;
+            if (ratio > 0.75) return '#dc2626';
+            if (ratio > 0.5) return '#f59e0b';
+            if (ratio > 0.25) return '#3b82f6';
+            return '#10b981';
         });
 
         const ctx = canvas.getContext('2d');
@@ -277,21 +338,14 @@ const Dashboard = {
                     label: 'Alertas',
                     data: values,
                     backgroundColor: colors,
-                    borderColor: colors.map(c => c),
-                    borderWidth: 1,
                     borderRadius: 4
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
                 plugins: {
-                    legend: {
-                        display: false
-                    },
-                    title: {
-                        display: false
-                    }
+                    legend: { display: false }
                 },
                 scales: {
                     x: {
@@ -301,11 +355,7 @@ const Dashboard = {
                     y: {
                         beginAtZero: true,
                         grid: { color: 'rgba(148, 163, 184, 0.1)' },
-                        ticks: {
-                            color: '#94a3b8',
-                            stepSize: 1,
-                            font: { size: 11 }
-                        }
+                        ticks: { color: '#94a3b8', stepSize: 1 }
                     }
                 }
             }
