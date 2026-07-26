@@ -416,6 +416,12 @@ body {
     margin-bottom: 16px;
     color: var(--text-secondary);
 }
+.chart-wrapper {
+    position: relative;
+    height: 250px;
+    max-height: 250px;
+    overflow: hidden;
+}
 
 /* === TABLAS === */
 .table-card {
