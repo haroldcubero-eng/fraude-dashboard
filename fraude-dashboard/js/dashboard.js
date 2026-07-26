@@ -1,8 +1,8 @@
 
 /* ============================================
-   DASHBOARD.JS — Métricas, gráficos y tablas
-   Los gráficos se calculan desde los datos de
-   pendientes (sin petición extra a n8n).
+   DASHBOARD.JS — Versión final
+   Gráficos calculados desde [DASHBOARD] resumen general
+   No depende del campo "hour" en pendientes.
    ============================================ */
 
 const Dashboard = {
@@ -31,7 +31,7 @@ const Dashboard = {
     async autoLoadData() {
         document.getElementById('status-text').textContent = 'Conectando...';
 
-        // 1. Resumen general (KPIs)
+        // 1. Resumen general (KPIs + gráficos)
         const dashResponse = await API.getDashboardData();
         if (dashResponse.success) {
             this.processDashboardResponse(dashResponse.message);
@@ -42,7 +42,7 @@ const Dashboard = {
             return;
         }
 
-        // 2. Pendientes (tabla de alertas + gráficos)
+        // 2. Pendientes (tabla de alertas)
         const pendResponse = await API.getPendientes();
         if (pendResponse.success) {
             this.processPendientesResponse(pendResponse.message);
@@ -54,15 +54,16 @@ const Dashboard = {
             this.processCentinelaResponse(centResponse.message);
         }
     },
-    
+
     // =============================================
     // Procesar respuesta del resumen general
-    // Ahora incluye datos para los gráficos
+    // Incluye KPIs + datos para gráficos
     // =============================================
     processDashboardResponse(responseText) {
         let data = this.tryParseJSON(responseText);
 
         if (data) {
+            // KPIs
             if (data.pendientes !== undefined) {
                 document.getElementById('kpi-pendientes').textContent = data.pendientes;
             }
@@ -91,10 +92,9 @@ const Dashboard = {
             this.extractMetricsFromText(responseText);
         }
     },
- 
+
     // =============================================
-    // Procesar respuesta de pendientes
-    // Llena tabla + calcula gráficos
+    // Procesar respuesta de pendientes (solo tabla)
     // =============================================
     processPendientesResponse(responseText) {
         let data = this.tryParseJSON(responseText);
@@ -129,63 +129,33 @@ const Dashboard = {
     },
 
     // =============================================
-    // CALCULAR GRÁFICOS desde datos de pendientes
+    // Procesar respuesta de centinela
     // =============================================
-    calcularYRenderizarGraficos(transacciones) {
-        // --- Gráfico 1: Distribución por nivel de riesgo ---
-        const distribucion = { 'CRITICO': 0, 'ALTO': 0, 'MEDIO': 0, 'BAJO': 0 };
+    processCentinelaResponse(responseText) {
+        let data = this.tryParseJSON(responseText);
+        const centinelaBody = document.getElementById('centinela-body');
 
-        transacciones.forEach(t => {
-            const nivel = (t.nivel_riesgo || '').toUpperCase().replace('Í', 'I');
-            if (distribucion.hasOwnProperty(nivel)) {
-                distribucion[nivel]++;
+        if (data && data.alertas && Array.isArray(data.alertas)) {
+            const rows = data.alertas.map(a => `
+                <tr>
+                    <td><strong>${a.tipo_alerta}</strong></td>
+                    <td>${a.tarjetas_distintas}</td>
+                    <td>${a.valor_compartido}</td>
+                    <td>${a.primera_deteccion}</td>
+                    <td><span class="badge badge-critical">${a.estado ? a.estado.toUpperCase() : 'ACTIVA'}</span></td>
+                </tr>
+            `).join('');
+
+            if (centinelaBody) centinelaBody.innerHTML = rows;
+            document.getElementById('kpi-centinela').textContent = data.total || data.alertas.length;
+        } else if (data && data.total === 0) {
+            if (centinelaBody) {
+                centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">✅ No hay campañas centinela activas en este momento.</div></td></tr>`;
             }
-        });
-
-        this.renderRiskChart(distribucion);
-
-        // --- Gráfico 2: Alertas por hora ---
-        // Intentar extraer hora del timestamp o transaction_id
-        const alertasPorHora = {};
-
-        transacciones.forEach(t => {
-            let hora = null;
-
-            // Intentar extraer hora del timestamp
-            if (t.timestamp) {
-                const date = new Date(t.timestamp);
-                if (!isNaN(date.getTime())) {
-                    hora = date.getHours().toString().padStart(2, '0') + ':00';
-                }
-            }
-            // Intentar con campo hour o hora (ambas variantes)
-            if (!hora && t.hour !== undefined && t.hour !== null) {
-                hora = t.hour.toString().padStart(2, '0') + ':00';
-            }
-            if (!hora && t.hora !== undefined && t.hora !== null) {
-                hora = t.hora.toString().padStart(2, '0') + ':00';
-            }
-       
-            // Si no hay hora, usar "Sin hora"
-            if (!hora) {
-                hora = 'N/A';
-            }
-
-            alertasPorHora[hora] = (alertasPorHora[hora] || 0) + 1;
-        });
-
-        // Convertir a array y ordenar por hora
-        const alertasArray = Object.keys(alertasPorHora)
-            .sort()
-            .map(hora => ({ hora: hora, cantidad: alertasPorHora[hora] }));
-
-        if (alertasArray.length > 0 && !(alertasArray.length === 1 && alertasArray[0].hora === 'N/A')) {
-            this.renderHourlyChart(alertasArray);
+            document.getElementById('kpi-centinela').textContent = '0';
         } else {
-            // Si no hay datos de hora, mostrar mensaje
-            const canvas = document.getElementById('chart-horas');
-            if (canvas) {
-                canvas.parentElement.innerHTML = '<div style="display:flex; align-items:center; justify-content:center; height:100%; color:#94a3b8; text-align:center; padding:1rem;"><span>Sin datos horarios disponibles.<br>Los datos de hora se mostrarán cuando las transacciones incluyan timestamp.</span></div>';
+            if (centinelaBody) {
+                centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
             }
         }
     },
@@ -309,38 +279,6 @@ const Dashboard = {
     },
 
     // =============================================
-    // Procesar respuesta de centinela
-    // =============================================
-    processCentinelaResponse(responseText) {
-        let data = this.tryParseJSON(responseText);
-        const centinelaBody = document.getElementById('centinela-body');
-
-        if (data && data.alertas && Array.isArray(data.alertas)) {
-            const rows = data.alertas.map(a => `
-                <tr>
-                    <td><strong>${a.tipo_alerta}</strong></td>
-                    <td>${a.tarjetas_distintas}</td>
-                    <td>${a.valor_compartido}</td>
-                    <td>${a.primera_deteccion}</td>
-                    <td><span class="badge badge-critical">${a.estado ? a.estado.toUpperCase() : 'ACTIVA'}</span></td>
-                </tr>
-            `).join('');
-
-            if (centinelaBody) centinelaBody.innerHTML = rows;
-            document.getElementById('kpi-centinela').textContent = data.total || data.alertas.length;
-        } else if (data && data.total === 0) {
-            if (centinelaBody) {
-                centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">✅ No hay campañas centinela activas en este momento.</div></td></tr>`;
-            }
-            document.getElementById('kpi-centinela').textContent = '0';
-        } else {
-            if (centinelaBody) {
-                centinelaBody.innerHTML = `<tr><td colspan="5"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
-            }
-        }
-    },
-
-    // =============================================
     // Validar desde la tabla
     // =============================================
     validarDesdeTabla(transactionId, decision) {
@@ -396,6 +334,8 @@ const Dashboard = {
         const detail = document.getElementById('retrain-detail');
         const progress = document.getElementById('retrain-progress');
         const umbral = 10;
+
+        if (!indicator || !detail || !progress) return;
 
         if (desacuerdos === null || desacuerdos === undefined) {
             if (estadoModelo) {
