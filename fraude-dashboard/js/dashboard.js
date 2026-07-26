@@ -121,9 +121,6 @@ const Dashboard = {
             if (pendientesBody) pendientesBody.innerHTML = rows;
             document.getElementById('kpi-pendientes').textContent = data.total || data.transacciones.length;
 
-            // *** CALCULAR Y RENDERIZAR GRÁFICOS ***
-            this.calcularYRenderizarGraficos(data.transacciones);
-
         } else {
             const html = `<tr><td colspan="6"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
             if (alertasBody) alertasBody.innerHTML = html;
