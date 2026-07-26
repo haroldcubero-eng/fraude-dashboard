@@ -152,12 +152,14 @@ const Dashboard = {
                     hora = date.getHours().toString().padStart(2, '0') + ':00';
                 }
             }
-
-            // Si no hay timestamp, intentar con el campo hour
-            if (!hora && t.hour !== undefined) {
+            // Intentar con campo hour o hora (ambas variantes)
+            if (!hora && t.hour !== undefined && t.hour !== null) {
                 hora = t.hour.toString().padStart(2, '0') + ':00';
             }
-
+            if (!hora && t.hora !== undefined && t.hora !== null) {
+                hora = t.hora.toString().padStart(2, '0') + ':00';
+            }
+       
             // Si no hay hora, usar "Sin hora"
             if (!hora) {
                 hora = 'N/A';
