@@ -851,3 +851,20 @@ body {
     background: var(--text-muted);
 }
 
+
+/* ============================================
+   FIX: Contenedores de gráficos Chart.js
+   Evita el crecimiento infinito del canvas
+   ============================================ */
+.chart-container {
+    position: relative;
+    height: 250px;
+    max-height: 250px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.chart-container canvas {
+    max-height: 250px;
+}
+
