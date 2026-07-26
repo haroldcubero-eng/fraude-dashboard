@@ -125,17 +125,21 @@
                         <div class="retrain-progress" id="retrain-progress"></div>
                     </div>
                 </div>
-
+                
                 <!-- Gráficos -->
                 <div class="charts-grid">
                     <div class="chart-card">
                         <h3 class="chart-title">Distribución por Nivel de Riesgo</h3>
-                        <canvas id="chart-riesgo"></canvas>
+                        <div style="position: relative; height: 250px; width: 100%;">
+                            <canvas id="chart-riesgo"></canvas>
+                        </div>
                     </div>
                     <div class="chart-card">
                         <h3 class="chart-title">Alertas por Hora (últimas 24h)</h3>
-                        <canvas id="chart-horas"></canvas>
-                    </div>
+                        <div style="position: relative; height: 250px; width: 100%;">
+                            <canvas id="chart-horas"></canvas>
+                        </div>
+                   </div>
                 </div>
 
                 <!-- Tabla resumen últimas alertas -->
