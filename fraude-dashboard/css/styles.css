@@ -874,3 +874,12 @@ body {
     max-height: 250px;
 }
 
+/* Centrar columna de acciones */
+#alertas-body td:last-child,
+#pendientes-body td:last-child {
+    text-align: center;
+}
+/* Centrar encabezado de acciones */
+th:last-child {
+    text-align: center;
+}
