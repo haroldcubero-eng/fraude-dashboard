@@ -205,7 +205,7 @@ const Dashboard = {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         position: 'bottom',
@@ -219,7 +219,7 @@ const Dashboard = {
                         color: '#ffffff',
                         font: {
                             weight: 'bold',
-                            size: 14
+                            size: 11
                         },
                         formatter: function(value, context) {
                             var total = context.dataset.data.reduce(function(a, b) { return a + b; }, 0);
