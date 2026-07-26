@@ -1,7 +1,7 @@
 
 /* ============================================
    APP.JS — Inicialización y navegación
-   Versión de producción (reemplaza la demo)
+   Versión de producción
    ============================================ */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -73,37 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializar Chat
     Chat.init();
     
-    // Inicializar Dashboard
+    // Inicializar Dashboard (esto dispara la carga automática de datos)
     Dashboard.init();
-
-    // =============================================
-    // 5. VERIFICAR CONEXIÓN CON n8n
-    // =============================================
-    checkSystemStatus();
 });
-
-// =============================================
-// Verificar estado del sistema al cargar
-// =============================================
-async function checkSystemStatus() {
-    const statusText = document.getElementById('status-text');
-    const statusDot = document.querySelector('.status-dot');
-    const modelHealth = document.getElementById('model-health');
-
-    statusText.textContent = 'Conectando...';
-
-    const isConnected = await API.checkConnection();
-
-    if (isConnected) {
-        statusText.textContent = 'Sistema Operativo';
-        statusDot.classList.remove('offline');
-        modelHealth.innerHTML = '<i class="fas fa-brain"></i><span class="nav-text">Modelo: OK</span>';
-        modelHealth.style.color = '#10b981';
-    } else {
-        statusText.textContent = 'Sin conexión';
-        statusDot.classList.add('offline');
-        modelHealth.innerHTML = '<i class="fas fa-brain"></i><span class="nav-text">Modelo: Offline</span>';
-        modelHealth.style.color = '#ef4444';
-    }
-}
 
