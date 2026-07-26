@@ -14,14 +14,9 @@ const API = {
 
     // =============================================
     // Enviar mensaje al agente de n8n
-    // Todas las interacciones pasan por aquí:
-    // - Chat del usuario
-    // - Acciones de botones
-    // - Solicitudes de datos del dashboard
     // =============================================
     async sendMessage(message, sessionId = null) {
         try {
-            // Generar o reutilizar sessionId para mantener contexto
             if (!sessionId) {
                 sessionId = API.getSessionId();
             }
@@ -35,7 +30,8 @@ const API = {
             const response = await fetch(this.WEBHOOK_URL, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
                 body: JSON.stringify(payload)
             });
@@ -45,21 +41,7 @@ const API = {
             }
 
             const data = await response.json();
-            
-            // n8n devuelve la respuesta en diferentes formatos
-            // dependiendo de la configuración del Chat Trigger
-            let output = '';
-            if (typeof data === 'string') {
-                output = data;
-            } else if (data.output) {
-                output = data.output;
-            } else if (data.text) {
-                output = data.text;
-            } else if (data.response) {
-                output = data.response;
-            } else {
-                output = JSON.stringify(data);
-            }
+            let output = this.extractOutput(data);
 
             return {
                 success: true,
@@ -78,8 +60,26 @@ const API = {
     },
 
     // =============================================
+    // Extraer el texto de respuesta del agente
+    // =============================================
+    extractOutput(data) {
+        if (typeof data === 'string') return data;
+        if (data.output) return data.output;
+        if (data.text) return data.text;
+        if (data.response) return data.response;
+        if (data.message) return data.message;
+        if (data.result) return data.result;
+        if (Array.isArray(data) && data.length > 0) {
+            const first = data[0];
+            if (first.output) return first.output;
+            if (first.text) return first.text;
+            if (first.response) return first.response;
+        }
+        return JSON.stringify(data);
+    },
+
+    // =============================================
     // Gestión de Session ID
-    // Mantiene la conversación con contexto en n8n
     // =============================================
     getSessionId() {
         let sessionId = localStorage.getItem('fraud_session_id');
@@ -90,7 +90,6 @@ const API = {
         return sessionId;
     },
 
-    // Reiniciar sesión (nueva conversación)
     resetSession() {
         const newSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('fraud_session_id', newSessionId);
@@ -98,53 +97,58 @@ const API = {
     },
 
     // =============================================
-    // Métodos de conveniencia para cada función
-    // Todos envían mensajes al mismo webhook
+    // MÉTODOS DASHBOARD — Usan prefijo [DASHBOARD]
+    // El agente responde con JSON estructurado
     // =============================================
 
-    // Solicitar datos del dashboard
+    // Solicitar resumen general (KPIs)
     async getDashboardData() {
-        return await this.sendMessage('mostrar resumen general del sistema');
+        return await this.sendMessage('[DASHBOARD] resumen general');
     },
 
-    // Consultar transacciones pendientes
+    // Consultar transacciones pendientes (tabla)
     async getPendientes() {
-        return await this.sendMessage('consultar pendientes');
+        return await this.sendMessage('[DASHBOARD] pendientes');
     },
 
-    // Clasificar una transacción
+    // Consultar alertas centinela (tabla)
+    async getCentinela() {
+        return await this.sendMessage('[DASHBOARD] centinela');
+    },
+
+    // Analizar patrones recientes
+    async analizarPatrones() {
+        return await this.sendMessage('[DASHBOARD] patrones');
+    },
+
+    // =============================================
+    // MÉTODOS CONVERSACIONALES — Sin prefijo
+    // El agente responde de forma natural con flujos
+    // =============================================
+
+    // Clasificar una transacción (conversacional)
     async clasificarTransaccion(datos) {
         const mensaje = `clasificar transacción con los siguientes datos: ${JSON.stringify(datos)}`;
         return await this.sendMessage(mensaje);
     },
 
-    // Validar una transacción
+    // Validar una transacción (conversacional)
     async validarTransaccion(transactionId, decision, motivo, confianza) {
         const mensaje = `validar transacción ${transactionId} como ${decision}. Motivo: ${motivo}. Nivel de confianza: ${confianza}`;
         return await this.sendMessage(mensaje);
     },
 
-    // Consultar alertas centinela
-    async getCentinela() {
-        return await this.sendMessage('consultar alertas centinela activas');
-    },
-
-    // Analizar patrones recientes
-    async analizarPatrones() {
-        return await this.sendMessage('analizar patrones recientes');
-    },
-
-    // Consultar detalle de una alerta
+    // Consultar detalle de una alerta (conversacional)
     async getAlertaDetalle(transactionId) {
         return await this.sendMessage(`consultar detalle de alerta ${transactionId}`);
     },
 
-    // Buscar alertas similares
+    // Buscar alertas similares (conversacional)
     async buscarSimilares(transactionId) {
         return await this.sendMessage(`buscar alertas similares a ${transactionId}`);
     },
 
-    // Explicar clasificación
+    // Explicar clasificación (conversacional)
     async explicar(transactionId) {
         return await this.sendMessage(`explicar la clasificación de ${transactionId}`);
     },
@@ -154,7 +158,7 @@ const API = {
     // =============================================
     async checkConnection() {
         try {
-            const result = await this.sendMessage('ping');
+            const result = await this.sendMessage('[DASHBOARD] resumen general');
             return result.success;
         } catch {
             return false;
