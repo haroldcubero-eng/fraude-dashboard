@@ -1,156 +1,107 @@
 
 /* ============================================
-   API.JS — Versión completa con getGraficos
+   API.JS — Versión con webhook separado
+   Dashboard: Code Node determinístico (sin LLM)
+   Chat: AI Agent con Gemini (conversacional)
    ============================================ */
 
 const API = {
-    WEBHOOK_URL: 'https://danielperez.app.n8n.cloud/webhook/73b0c003-c74e-4e6a-b99e-44477979e8e2/chat',
+    // URL para datos del dashboard (Code Node - determinístico)
+    dashboardUrl: 'https://danielperez.app.n8n.cloud/webhook/dashboard-data',
+
+    // URL para chat conversacional (AI Agent - Gemini)
+    chatUrl: 'https://danielperez.app.n8n.cloud/webhook/73b0c003-c74e-4e6a-b99e-44477979e8e2/chat',
 
     // =============================================
-    // Enviar mensaje al agente de n8n
+    // Enviar comando al dashboard (determinístico)
     // =============================================
-    async sendMessage(message, sessionId = null) {
+    async sendDashboardCommand(comando) {
         try {
-            if (!sessionId) {
-                sessionId = API.getSessionId();
-            }
-
-            const payload = {
-                action: 'sendMessage',
-                sessionId: sessionId,
-                chatInput: message
-            };
-
-            const response = await fetch(this.WEBHOOK_URL, {
+            const response = await fetch(this.dashboardUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(payload)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chatInput: '[DASHBOARD] ' + comando })
             });
 
             if (!response.ok) {
-                throw new Error(`Error HTTP: ${response.status}`);
+                return { success: false, message: 'Error HTTP: ' + response.status };
             }
 
             const data = await response.json();
-            let output = this.extractOutput(data);
-
-            return {
-                success: true,
-                message: output,
-                raw: data
-            };
-
+            // El Code Node devuelve { output: "JSON string" }
+            const output = data.output || data;
+            return { success: true, message: typeof output === 'string' ? output : JSON.stringify(output) };
         } catch (error) {
-            console.error('Error al comunicarse con n8n:', error);
-            return {
-                success: false,
-                message: 'Error de conexión con el servidor. Verifica que n8n esté activo.',
-                error: error.message
-            };
+            console.error('Error dashboard:', error);
+            return { success: false, message: 'Error de conexión: ' + error.message };
         }
     },
 
     // =============================================
-    // Extraer el texto de respuesta
+    // Enviar mensaje al chat (conversacional)
     // =============================================
-    extractOutput(data) {
-        if (typeof data === 'string') return data;
-        if (data.output) return data.output;
-        if (data.text) return data.text;
-        if (data.response) return data.response;
-        if (data.message) return data.message;
-        if (data.result) return data.result;
-        if (Array.isArray(data) && data.length > 0) {
-            const first = data[0];
-            if (first.output) return first.output;
-            if (first.text) return first.text;
-            if (first.response) return first.response;
+    async sendChatMessage(message) {
+        try {
+            const response = await fetch(this.chatUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chatInput: message })
+            });
+
+            if (!response.ok) {
+                return { success: false, message: 'Error HTTP: ' + response.status };
+            }
+
+            const data = await response.json();
+            const output = data.output || data.response || data.text || JSON.stringify(data);
+            return { success: true, message: typeof output === 'string' ? output : JSON.stringify(output) };
+        } catch (error) {
+            console.error('Error chat:', error);
+            return { success: false, message: 'Error de conexión: ' + error.message };
         }
-        return JSON.stringify(data);
     },
 
     // =============================================
-    // Gestión de Session ID
+    // Funciones específicas del dashboard
+    // Todas usan el webhook determinístico
     // =============================================
-    getSessionId() {
-        let sessionId = localStorage.getItem('fraud_session_id');
-        if (!sessionId) {
-            sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('fraud_session_id', sessionId);
-        }
-        return sessionId;
-    },
-
-    resetSession() {
-        const newSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('fraud_session_id', newSessionId);
-        return newSessionId;
-    },
-
-    // =============================================
-    // MÉTODOS DASHBOARD — Prefijo [DASHBOARD]
-    // =============================================
-
     async getDashboardData() {
-        return await this.sendMessage('[DASHBOARD] resumen general');
+        return await this.sendDashboardCommand('resumen general');
     },
 
     async getPendientes() {
-        return await this.sendMessage('[DASHBOARD] pendientes');
+        return await this.sendDashboardCommand('pendientes');
     },
 
     async getCentinela() {
-        return await this.sendMessage('[DASHBOARD] centinela');
+        return await this.sendDashboardCommand('centinela');
     },
 
     async analizarPatrones() {
-        return await this.sendMessage('[DASHBOARD] patrones');
+        return await this.sendDashboardCommand('patrones');
     },
 
-    // NUEVO: Datos para gráficos
-    //async getGraficos() {
-    //    return await this.sendMessage('[DASHBOARD] graficos');
-    //},
-
     // =============================================
-    // MÉTODOS CONVERSACIONALES — Sin prefijo
+    // Funciones del chat conversacional
+    // Usan el AI Agent con Gemini
     // =============================================
-
     async clasificarTransaccion(datos) {
-        const mensaje = `clasificar transacción con los siguientes datos: ${JSON.stringify(datos)}`;
-        return await this.sendMessage(mensaje);
+        const campos = Object.entries(datos).map(([k, v]) => k + ': ' + v).join(', ');
+        return await this.sendChatMessage('clasificar transacción con estos datos: ' + campos);
     },
 
-    async validarTransaccion(transactionId, decision, motivo, confianza) {
-        const mensaje = `validar transacción ${transactionId} como ${decision}. Motivo: ${motivo}. Nivel de confianza: ${confianza}`;
-        return await this.sendMessage(mensaje);
+    async validarTransaccion(transactionId, decision, motivo) {
+        let mensaje = 'validar transacción ' + transactionId + ' como ' + decision;
+        if (motivo) mensaje += ' motivo: ' + motivo;
+        return await this.sendChatMessage(mensaje);
     },
 
-    async getAlertaDetalle(transactionId) {
-        return await this.sendMessage(`consultar detalle de alerta ${transactionId}`);
+    async explicarAlerta(transactionId) {
+        return await this.sendChatMessage('explicar alerta de transacción ' + transactionId);
     },
 
     async buscarSimilares(transactionId) {
-        return await this.sendMessage(`buscar alertas similares a ${transactionId}`);
-    },
-
-    async explicar(transactionId) {
-        return await this.sendMessage(`explicar la clasificación de ${transactionId}`);
-    },
-
-    // =============================================
-    // Verificar conexión
-    // =============================================
-    async checkConnection() {
-        try {
-            const result = await this.sendMessage('[DASHBOARD] resumen general');
-            return result.success;
-        } catch {
-            return false;
-        }
+        return await this.sendChatMessage('buscar alertas similares a transacción ' + transactionId);
     }
 };
 
