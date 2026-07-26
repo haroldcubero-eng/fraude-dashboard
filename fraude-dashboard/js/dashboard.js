@@ -159,7 +159,7 @@ const Dashboard = {
             }
         }
     },
-
+    
     // =============================================
     // Renderizar gráfico de distribución de riesgo
     // =============================================
@@ -214,10 +214,25 @@ const Dashboard = {
                             padding: 15,
                             font: { size: 12 }
                         }
+                    },
+                    datalabels: {
+                        color: '#ffffff',
+                        font: {
+                            weight: 'bold',
+                            size: 14
+                        },
+                        formatter: function(value, context) {
+                            var total = context.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+                            var percentage = Math.round((value / total) * 100);
+                            return value + ' (' + percentage + '%)';
+                        },
+                        anchor: 'center',
+                        align: 'center'
                     }
                 },
                 cutout: '60%'
-            }
+            },
+            plugins: [ChartDataLabels]
         });
     },
 
