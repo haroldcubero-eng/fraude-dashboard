@@ -110,6 +110,7 @@ const Dashboard = {
                     <td>${(t.probabilidad_fraude * 100).toFixed(1)}%</td>
                     <td><span class="badge badge-${this.getBadgeClass(t.nivel_riesgo)}">${t.nivel_riesgo}</span></td>
                     <td><span class="badge badge-pending">PENDIENTE</span></td>
+                    <td>${t.hour !== undefined && t.hour !== null ? t.hour.toString().padStart(2, '0') + ':00' : '-'}</td>
                     <td>
                         <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'fraude')">✅ Fraude</button>
                         <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'legitima')">❌ Legítima</button>
