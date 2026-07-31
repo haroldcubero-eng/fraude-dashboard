@@ -302,6 +302,29 @@ const Dashboard = {
     },
 
     // =============================================
+    // Mostrar formulario de clasificación
+    // =============================================
+    showClasificacionForm() {
+
+       // Ocultar vistas principales
+       document.getElementById('dashboard-view').classList.add('hidden');
+       document.getElementById('alertas-view').classList.add('hidden');
+       document.getElementById('centinela-view').classList.add('hidden');
+
+       // Mostrar formulario
+       document.getElementById('clasificacion-view').classList.remove('hidden');
+
+       // Actualizar menú lateral
+       document.querySelectorAll('.nav-item').forEach(item => {
+           item.classList.remove('active');
+       });
+
+    document
+        .querySelector('[data-view="clasificacion"]')
+        ?.classList.add('active');
+},
+  
+    // =============================================
     // Intentar parsear JSON
     // =============================================
     tryParseJSON(text) {
@@ -622,4 +645,3 @@ const Dashboard = {
         }
     }
 };
-
