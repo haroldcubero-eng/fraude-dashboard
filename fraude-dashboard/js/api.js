@@ -89,11 +89,17 @@ const API = {
         const campos = Object.entries(datos).map(([k, v]) => k + ': ' + v).join(', ');
         return await this.sendChatMessage('clasificar transacción con estos datos: ' + campos);
     },
+    
+    async clasificarTransaccion(datos) {
+       const mensaje = `
+    clasificar transaccion usando exactamente este JSON.
+    No modifiques nombres de campos ni valores.
+    Envia este objeto a la herramienta predecir:
+   
+    ${JSON.stringify(datos, null, 2)}
+    `;
 
-    async validarTransaccion(transactionId, decision, motivo) {
-        let mensaje = 'validar transacción ' + transactionId + ' como ' + decision;
-        if (motivo) mensaje += ' motivo: ' + motivo;
-        return await this.sendChatMessage(mensaje);
+       return await this.sendChatMessage(mensaje);
     },
 
     async explicarAlerta(transactionId) {
