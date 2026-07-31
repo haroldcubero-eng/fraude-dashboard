@@ -62,8 +62,27 @@ const Chat = {
         const loadingId = this.showLoading();
 
         // Enviar a n8n
-        const response = await API.sendMessage(text);
-
+        try {
+            const response = await API.sendChatMessage(text);
+            this.removeLoading(loadingId);
+            if (response.success) {
+                const parsed = this.parseResponse(response.message);
+                this.addMessage(parsed.text, 'bot', parsed.buttons);
+                this.checkForDashboardUpdate(text, response.message);
+            } else {
+               this.addMessage('⚠️ ' + response.message, 'bot');
+            }
+        } catch (error) {
+           console.error(error);
+           this.removeLoading(loadingId);
+           this.addMessage(
+               '⚠️ Error de comunicación con el agente: ' + error.message,
+               'bot'
+           );
+        } finally {
+           this.isProcessing = false;
+       }
+  
         // Remover indicador de carga
         this.removeLoading(loadingId);
 
