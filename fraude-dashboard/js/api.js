@@ -45,7 +45,7 @@ const API = {
             const response = await fetch(this.chatUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chatInput: message })
+                body: JSON.stringify({ chatInput: message, sessionId: "dashboard-user" })
             });
 
             if (!response.ok) {
