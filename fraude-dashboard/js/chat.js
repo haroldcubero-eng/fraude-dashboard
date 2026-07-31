@@ -82,24 +82,6 @@ const Chat = {
         } finally {
            this.isProcessing = false;
        }
-  
-        // Remover indicador de carga
-        this.removeLoading(loadingId);
-
-        if (response.success) {
-            // Parsear la respuesta (separar texto de botones)
-            const parsed = this.parseResponse(response.message);
-            
-            // Mostrar respuesta del bot
-            this.addMessage(parsed.text, 'bot', parsed.buttons);
-
-            // Si la respuesta contiene datos relevantes, actualizar el dashboard
-            this.checkForDashboardUpdate(text, response.message);
-        } else {
-            this.addMessage('⚠️ ' + response.message, 'bot');
-        }
-
-        this.isProcessing = false;
     },
 
     // =============================================
