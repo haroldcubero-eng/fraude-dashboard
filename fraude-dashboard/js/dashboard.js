@@ -112,7 +112,7 @@ const Dashboard = {
                     <td><span class="badge badge-pending">PENDIENTE</span></td>
                     <td>${t.hour !== undefined && t.hour !== null ? t.hour.toString().padStart(2, '0') + ':00' : '-'}</td>
                     <td>
-                        <button class="btn-detalle" onclick="Dashboard.('${t.transaction_id}')">🔍 Detalles</button>
+                        <button class="btn-detalle" onclick="Dashboard.verDetalle('${t.transaction_id}')">🔍 Detalles</button>
                         <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'fraude')">🚨 Fraude</button>
                         <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'legitima')">❌ Legítima</button>
                     </td>
