@@ -112,7 +112,7 @@ const Dashboard = {
                     <td><span class="badge badge-pending">PENDIENTE</span></td>
                     <td>${t.hour !== undefined && t.hour !== null ? t.hour.toString().padStart(2, '0') + ':00' : '-'}</td>
                     <td>
-                        <button class="btn-detalle" onclick="verDetalle('${t.transaction_id}')">🔍 Detalles</button>
+                        <button class="btn-detalle" onclick="Dashboard.('${t.transaction_id}')">🔍 Detalles</button>
                         <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'fraude')">🚨 Fraude</button>
                         <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'legitima')">❌ Legítima</button>
                     </td>
@@ -301,7 +301,15 @@ const Dashboard = {
     validarDesdeTabla(transactionId, decision) {
         Chat.sendUserMessage(`validar transacción ${transactionId} como ${decision}`);
     },
-
+    // 👇 AGREGAR AQUÍ 👇
+    verDetalle(transactionId) {
+        const chatInput = document.getElementById('chat-input');
+        const chatForm = document.getElementById('chat-form');
+        if (chatInput && chatForm) {
+            chatInput.value = `consultar detalle de alerta ${transactionId}`;
+            chatForm.dispatchEvent(new Event('submit'));
+        }
+    },
  
     // =============================================
     // Intentar parsear JSON
