@@ -112,6 +112,7 @@ const Dashboard = {
                     <td><span class="badge badge-pending">PENDIENTE</span></td>
                     <td>${t.hour !== undefined && t.hour !== null ? t.hour.toString().padStart(2, '0') + ':00' : '-'}</td>
                     <td>
+                        <button class="action-btn" onclick="Dashboard.explicarDesdeTabla('${t.transaction_id}')">🔍 Detalle</button>
                         <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'fraude')">✅ Fraude</button>
                         <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'legitima')">❌ Legítima</button>
                     </td>
@@ -299,6 +300,13 @@ const Dashboard = {
     // =============================================
     validarDesdeTabla(transactionId, decision) {
         Chat.sendUserMessage(`validar transacción ${transactionId} como ${decision}`);
+    },
+
+    // =============================================
+    // Explicar alerta desde la tabla
+    // =============================================
+    explicarDesdeTabla(transactionId) {
+        Chat.sendUserMessage(`explicar alerta de transacción ${transactionId}`);
     },
 
  
