@@ -119,8 +119,6 @@ const Dashboard = {
                     <td>${t.hour !== undefined && t.hour !== null ? t.hour.toString().padStart(2, '0') + ':00' : '-'}</td>
                     <td>
                         <button class="action-btn" onclick="Dashboard.explicarDesdeTabla('${t.transaction_id}')">🔍 Detalle</button>
-                        <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'fraude')">✅ Fraude</button>
-                        <button class="action-btn" onclick="Dashboard.validarDesdeTabla('${t.transaction_id}', 'legitima')">❌ Legítima</button>
                     </td>
                 </tr>
             `).join('');
@@ -299,13 +297,6 @@ const Dashboard = {
                 }
             }
         });
-    },
-
-    // =============================================
-    // Validar desde la tabla
-    // =============================================
-    validarDesdeTabla(transactionId, decision) {
-        Chat.sendUserMessage(`decision analista para la transaccion ${transactionId} es : ${decision}`);
     },
 
     // =============================================
