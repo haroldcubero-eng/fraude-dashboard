@@ -305,7 +305,7 @@ const Dashboard = {
     // Validar desde la tabla
     // =============================================
     validarDesdeTabla(transactionId, decision) {
-        Chat.sendUserMessage(`validar transacción ${transactionId} como ${decision}`);
+        Chat.sendUserMessage(`decision analista para la transaccion ${transactionId} es : ${decision}`);
     },
 
     // =============================================
