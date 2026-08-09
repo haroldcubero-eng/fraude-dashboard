@@ -103,7 +103,13 @@ const Dashboard = {
         const pendientesBody = document.getElementById('pendientes-body');
 
         if (data && data.transacciones && Array.isArray(data.transacciones)) {
-            const rows = data.transacciones.map(t => `
+            // Orden defensivo: independientemente de si el dato vino del
+            // webhook determinístico o del AI Agent del chat, siempre se
+            // muestra por probabilidad de fraude descendente.
+            const transacciones = [...data.transacciones].sort(
+                (a, b) => (b.probabilidad_fraude || 0) - (a.probabilidad_fraude || 0)
+            );
+            const rows = transacciones.map(t => `
                 <tr>
                     <td><strong>${t.transaction_id}</strong></td>
                     <td>$${parseFloat(t.transaction_amt).toFixed(2)}</td>
