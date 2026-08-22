@@ -53,6 +53,12 @@ const Dashboard = {
         if (centResponse.success) {
             this.processCentinelaResponse(centResponse.message);
         }
+
+        // 4. Historial de validaciones
+        const validResponse = await API.getValidaciones();
+        if (validResponse.success) {
+            this.processValidacionesResponse(validResponse.message);
+        }
     },
 
     // =============================================
@@ -166,6 +172,155 @@ const Dashboard = {
         }
     },
     
+    // =============================================
+    // Procesar respuesta de historial de validaciones
+    // Espera: { total, validaciones: [ { transaction_id,
+    //   timestamp_validacion, etiqueta_humana, estado,
+    //   tipo_desacuerdo, fraude_confirmado, peso_reentrenamiento,
+    //   nivel_riesgo, probabilidad_fraude, ... } ] }
+    // =============================================
+    processValidacionesResponse(responseText) {
+        let data = this.tryParseJSON(responseText);
+        const body = document.getElementById('validaciones-body');
+        const statsContainer = document.getElementById('validation-stats');
+
+        // Acepta tanto { validaciones: [...] } como el array crudo que
+        // devuelve PostgREST (Supabase) directamente.
+        let lista = null;
+        if (Array.isArray(data)) lista = data;
+        else if (data && Array.isArray(data.validaciones)) lista = data.validaciones;
+
+        if (lista) {
+            // Si vino como embed de PostgREST (?select=*,auditoria_fraude(...)),
+            // cada fila trae un objeto anidado "auditoria_fraude" en vez de
+            // los campos nivel_riesgo/probabilidad_fraude planos. Se aplana.
+            lista = lista.map(v => {
+                if (v.auditoria_fraude && typeof v.auditoria_fraude === 'object') {
+                    return { ...v, ...v.auditoria_fraude };
+                }
+                return v;
+            });
+
+            const validaciones = [...lista].sort(
+                (a, b) => new Date(b.timestamp_validacion) - new Date(a.timestamp_validacion)
+            );
+
+            if (validaciones.length === 0) {
+                if (body) body.innerHTML = `<tr><td colspan="6"><div class="result-explanation">✅ Todavía no hay validaciones registradas.</div></td></tr>`;
+                if (statsContainer) statsContainer.innerHTML = '';
+                return;
+            }
+
+            const rows = validaciones.map(v => {
+                const resultado = this.getResultadoValidacion(v);
+                const decision = this.getDecisionAnalista(v);
+                return `
+                <tr>
+                    <td><strong>${v.transaction_id}</strong></td>
+                    <td>${v.nivel_riesgo ? `<span class="badge badge-${this.getBadgeClass(v.nivel_riesgo)}">${v.nivel_riesgo}</span>` : '-'}</td>
+                    <td>${decision}</td>
+                    <td><span class="badge badge-${resultado.badge}">${resultado.label}</span></td>
+                    <td>${v.peso_reentrenamiento ?? '-'}</td>
+                    <td>${this.formatFecha(v.timestamp_validacion)}</td>
+                </tr>`;
+            }).join('');
+
+            if (body) body.innerHTML = rows;
+            this.renderValidationStats(validaciones, statsContainer);
+
+        } else {
+            if (body) body.innerHTML = `<tr><td colspan="6"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
+            if (statsContainer) statsContainer.innerHTML = '';
+        }
+    },
+
+    // =============================================
+    // Derivar decisión del analista (fraude_confirmado / etiqueta_humana)
+    // =============================================
+    getDecisionAnalista(v) {
+        let raw = v.fraude_confirmado;
+        if (raw === undefined || raw === null || raw === '') {
+            raw = v.etiqueta_humana;
+        }
+        if (raw === undefined || raw === null || raw === '') return '-';
+
+        const positivos = ['si', 'sí', 'true', '1', 'fraude'];
+        const esFraude = positivos.includes(String(raw).toLowerCase().trim());
+        return esFraude
+            ? '<span class="badge badge-critical">FRAUDE</span>'
+            : '<span class="badge badge-low">NO FRAUDE</span>';
+    },
+
+    // =============================================
+    // Derivar resultado (acuerdo/desacuerdo) del cruce modelo-analista
+    // =============================================
+    getResultadoValidacion(v) {
+        if (v.tipo_desacuerdo && String(v.tipo_desacuerdo).trim() !== '') {
+            return { label: v.tipo_desacuerdo.toUpperCase(), badge: 'critical' };
+        }
+        if (v.estado && String(v.estado).trim() !== '') {
+            const estado = v.estado.toLowerCase();
+            if (estado.includes('desacuerdo') || estado.includes('incorrect')) {
+                return { label: v.estado.toUpperCase(), badge: 'critical' };
+            }
+            return { label: v.estado.toUpperCase(), badge: 'validated' };
+        }
+        return { label: 'ACUERDO', badge: 'validated' };
+    },
+
+    // =============================================
+    // Mini KPIs del historial de validaciones
+    // =============================================
+    renderValidationStats(validaciones, container) {
+        if (!container) return;
+
+        const total = validaciones.length;
+        const desacuerdos = validaciones.filter(v => this.getResultadoValidacion(v).badge === 'critical').length;
+        const acuerdos = total - desacuerdos;
+        const tasaAcuerdo = total > 0 ? ((acuerdos / total) * 100).toFixed(1) : '0.0';
+
+        container.innerHTML = `
+            <div class="kpi-card kpi-success">
+                <div class="kpi-icon"><i class="fas fa-check"></i></div>
+                <div class="kpi-data">
+                    <span class="kpi-value">${acuerdos}</span>
+                    <span class="kpi-label">Acuerdos</span>
+                </div>
+            </div>
+            <div class="kpi-card kpi-danger">
+                <div class="kpi-icon"><i class="fas fa-times"></i></div>
+                <div class="kpi-data">
+                    <span class="kpi-value">${desacuerdos}</span>
+                    <span class="kpi-label">Desacuerdos</span>
+                </div>
+            </div>
+            <div class="kpi-card kpi-warning">
+                <div class="kpi-icon"><i class="fas fa-percentage"></i></div>
+                <div class="kpi-data">
+                    <span class="kpi-value">${tasaAcuerdo}%</span>
+                    <span class="kpi-label">Tasa de Acuerdo</span>
+                </div>
+            </div>
+            <div class="kpi-card kpi-alert">
+                <div class="kpi-icon"><i class="fas fa-list"></i></div>
+                <div class="kpi-data">
+                    <span class="kpi-value">${total}</span>
+                    <span class="kpi-label">Total Validadas</span>
+                </div>
+            </div>
+        `;
+    },
+
+    // =============================================
+    // Formatear fecha ISO a formato local
+    // =============================================
+    formatFecha(iso) {
+        if (!iso) return '-';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    },
+
     // =============================================
     // Renderizar gráfico de distribución de riesgo
     // =============================================
@@ -523,6 +678,18 @@ const Dashboard = {
                 if (response.success) this.processCentinelaResponse(response.message);
                 btnCentinela.disabled = false;
                 btnCentinela.innerHTML = '<i class="fas fa-sync-alt"></i> Actualizar';
+            });
+        }
+
+        const btnValidaciones = document.getElementById('btn-refresh-validaciones');
+        if (btnValidaciones) {
+            btnValidaciones.addEventListener('click', async () => {
+                btnValidaciones.disabled = true;
+                btnValidaciones.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+                const response = await API.getValidaciones();
+                if (response.success) this.processValidacionesResponse(response.message);
+                btnValidaciones.disabled = false;
+                btnValidaciones.innerHTML = '<i class="fas fa-sync-alt"></i> Actualizar';
             });
         }
 

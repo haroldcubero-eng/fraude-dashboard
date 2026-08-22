@@ -81,6 +81,10 @@ const API = {
         return await this.sendDashboardCommand('patrones');
     },
 
+    async getValidaciones() {
+        return await this.sendDashboardCommand('historial_validaciones');
+    },
+
     // =============================================
     // Funciones del chat conversacional
     // Usan el AI Agent con Gemini

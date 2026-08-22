@@ -335,8 +335,11 @@
             <section class="section" id="section-validaciones">
                 <h2 class="section-title"><i class="fas fa-check-double"></i> Historial de Validaciones</h2>
                 <p class="section-desc">Registro de decisiones del analista y métricas de acuerdo con el modelo.</p>
-                <div class="validation-stats" id="validation-stats">
-                    <!-- Métricas de validación -->
+                <button class="btn-refresh" id="btn-refresh-validaciones">
+                    <i class="fas fa-sync-alt"></i> Actualizar
+                </button>
+                <div class="kpi-grid validation-stats" id="validation-stats">
+                    <!-- Métricas de validación: se llena dinámicamente -->
                 </div>
                 <div class="table-card">
                     <table class="data-table" id="table-validaciones">
