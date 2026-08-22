@@ -17,10 +17,15 @@ const API = {
     // =============================================
     async sendDashboardCommand(comando) {
         try {
+            // sessionId nuevo en cada llamada: los comandos [DASHBOARD] son
+            // consultas de estado sin memoria conversacional. Si no se manda
+            // uno, el AI Agent puede terminar compartiendo la memoria (Window
+            // Buffer Memory) entre llamadas y arrastrar respuestas viejas.
+            const sessionId = 'dashboard-' + Date.now() + '-' + Math.random().toString(36).slice(2);
             const response = await fetch(this.dashboardUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chatInput: '[DASHBOARD] ' + comando })
+                body: JSON.stringify({ chatInput: '[DASHBOARD] ' + comando, sessionId })
             });
 
             if (!response.ok) {

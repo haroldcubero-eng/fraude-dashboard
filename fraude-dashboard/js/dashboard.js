@@ -206,7 +206,7 @@ const Dashboard = {
             );
 
             if (validaciones.length === 0) {
-                if (body) body.innerHTML = `<tr><td colspan="6"><div class="result-explanation">✅ Todavía no hay validaciones registradas.</div></td></tr>`;
+                if (body) body.innerHTML = `<tr><td colspan="8"><div class="result-explanation">✅ Todavía no hay validaciones registradas.</div></td></tr>`;
                 if (statsContainer) statsContainer.innerHTML = '';
                 return;
             }
@@ -214,6 +214,10 @@ const Dashboard = {
             const rows = validaciones.map(v => {
                 const resultado = this.getResultadoValidacion(v);
                 const decision = this.getDecisionAnalista(v);
+                // Texto libre cargado por el analista: viene sin sanitizar de
+                // Supabase, se escapa antes de insertarlo como HTML.
+                const motivo = v.motivo_validacion ? this.escapeHtml(v.motivo_validacion) : '-';
+                const comentario = v.comentario_analista ? this.escapeHtml(v.comentario_analista) : '-';
                 return `
                 <tr>
                     <td><strong>${v.transaction_id}</strong></td>
@@ -221,6 +225,8 @@ const Dashboard = {
                     <td>${decision}</td>
                     <td><span class="badge badge-${resultado.badge}">${resultado.label}</span></td>
                     <td>${v.peso_reentrenamiento ?? '-'}</td>
+                    <td>${motivo}</td>
+                    <td>${comentario}</td>
                     <td>${this.formatFecha(v.timestamp_validacion)}</td>
                 </tr>`;
             }).join('');
@@ -229,9 +235,18 @@ const Dashboard = {
             this.renderValidationStats(validaciones, statsContainer);
 
         } else {
-            if (body) body.innerHTML = `<tr><td colspan="6"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
+            if (body) body.innerHTML = `<tr><td colspan="8"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
             if (statsContainer) statsContainer.innerHTML = '';
         }
+    },
+
+    // =============================================
+    // Escapar HTML de texto libre (comentarios del analista)
+    // =============================================
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     },
 
     // =============================================
