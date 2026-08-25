@@ -7,7 +7,6 @@
 
 const Dashboard = {
     charts: {},
-    refreshInterval: null,
 
     // =============================================
     // Inicializar dashboard
@@ -16,13 +15,11 @@ const Dashboard = {
         this.setupRefreshButtons();
         this.setupPredictForm();
 
-        // CARGA AUTOMÁTICA al iniciar
+        // Carga única al abrir el dashboard. Sin auto-refresh periódico:
+        // cada comando [DASHBOARD] consume una ejecución de n8n, así que
+        // el resto de las actualizaciones quedan a demanda (botones
+        // "Actualizar" de cada sección).
         this.autoLoadData();
-
-        // Auto-refresh cada 5 minutos
-        this.refreshInterval = setInterval(() => {
-            this.autoLoadData();
-        }, 300000);
     },
 
     // =============================================
