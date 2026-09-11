@@ -52,11 +52,13 @@ const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chatInput: message,
-                    sessionId: "dashboard-user",
-                    // Email del analista logueado (Supabase Auth). Viaja en
-                    // cada mensaje para que n8n lo tenga disponible al
-                    // registrar una validación en la tabla `validaciones`.
-                    analistaEmail: (typeof Auth !== 'undefined' && Auth.currentUserEmail) ? Auth.currentUserEmail : null
+                    // El email del analista logueado (Supabase Auth) viaja
+                    // codificado dentro de sessionId con el separador "::",
+                    // porque es el único campo que el Chat Trigger de n8n
+                    // garantiza exponer sin normalizarlo/descartarlo. De paso,
+                    // separa la memoria conversacional por analista en vez
+                    // de compartir una sola sesión entre todo el equipo.
+                    sessionId: `dashboard-user::${(typeof Auth !== 'undefined' && Auth.currentUserEmail) ? Auth.currentUserEmail : 'anonimo'}`
                 })
             });
 
