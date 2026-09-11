@@ -8,8 +8,8 @@
 
 // ⚠️ COMPLETAR: Settings > API en el dashboard de Supabase.
 // Usar la "anon key" (pública), nunca la "service_role".
-const SUPABASE_URL = 'PONÉ_ACÁ_TU_URL_DE_SUPABASE';
-const SUPABASE_ANON_KEY = 'PONÉ_ACÁ_TU_ANON_KEY';
+const SUPABASE_URL = 'https://oxfymqitrkomvalqdyqd.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im94ZnltcWl0cmtvbXZhbHFkeXFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwOTY3NjEsImV4cCI6MjA5ODY3Mjc2MX0.XaTMTjjqf-m-BShDh8dtFIvcm4bEpZSAifttI2RUpLs';
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
