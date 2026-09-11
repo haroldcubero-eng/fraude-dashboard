@@ -224,9 +224,9 @@ const Dashboard = {
                     <td><span class="badge badge-${resultado.badge}">${resultado.label}</span></td>
                     <td>${v.peso_reentrenamiento ?? '-'}</td>
                     <td>${motivo}</td>
+                    <td>${analista}</td>
                     <td>${comentario}</td>
                     <td>${this.formatFecha(v.timestamp_validacion)}</td>
-                    <td>${analista}</td>
                 </tr>`;
             }).join('');
 
