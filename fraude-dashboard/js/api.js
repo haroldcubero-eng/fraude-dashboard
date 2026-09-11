@@ -50,7 +50,14 @@ const API = {
             const response = await fetch(this.chatUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chatInput: message, sessionId: "dashboard-user" })
+                body: JSON.stringify({
+                    chatInput: message,
+                    sessionId: "dashboard-user",
+                    // Email del analista logueado (Supabase Auth). Viaja en
+                    // cada mensaje para que n8n lo tenga disponible al
+                    // registrar una validación en la tabla `validaciones`.
+                    analistaEmail: (typeof Auth !== 'undefined' && Auth.currentUserEmail) ? Auth.currentUserEmail : null
+                })
             });
 
             if (!response.ok) {

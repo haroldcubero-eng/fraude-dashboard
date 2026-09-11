@@ -69,11 +69,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // =============================================
     // 4. INICIALIZAR MÓDULOS
     // =============================================
-    
-    // Inicializar Chat
-    Chat.init();
-    
-    // Inicializar Dashboard (esto dispara la carga automática de datos)
-    Dashboard.init();
+    // Chat.init() y Dashboard.init() ya NO se llaman acá. Se disparan
+    // desde auth.js (Auth.onLoginSuccess) recién cuando el analista
+    // inicia sesión, para que nada del dashboard cargue datos antes
+    // de autenticarse.
 });
 
