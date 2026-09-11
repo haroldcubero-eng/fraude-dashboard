@@ -203,7 +203,7 @@ const Dashboard = {
             );
 
             if (validaciones.length === 0) {
-                if (body) body.innerHTML = `<tr><td colspan="8"><div class="result-explanation">✅ Todavía no hay validaciones registradas.</div></td></tr>`;
+                if (body) body.innerHTML = `<tr><td colspan="9"><div class="result-explanation">✅ Todavía no hay validaciones registradas.</div></td></tr>`;
                 if (statsContainer) statsContainer.innerHTML = '';
                 return;
             }
@@ -215,6 +215,7 @@ const Dashboard = {
                 // Supabase, se escapa antes de insertarlo como HTML.
                 const motivo = v.motivo_validacion ? this.escapeHtml(v.motivo_validacion) : '-';
                 const comentario = v.comentario_analista ? this.escapeHtml(v.comentario_analista) : '-';
+                const analista = v.analista_email ? this.escapeHtml(v.analista_email) : '-';
                 return `
                 <tr>
                     <td><strong>${v.transaction_id}</strong></td>
@@ -225,6 +226,7 @@ const Dashboard = {
                     <td>${motivo}</td>
                     <td>${comentario}</td>
                     <td>${this.formatFecha(v.timestamp_validacion)}</td>
+                    <td>${analista}</td>
                 </tr>`;
             }).join('');
 
@@ -232,7 +234,7 @@ const Dashboard = {
             this.renderValidationStats(validaciones, statsContainer);
 
         } else {
-            if (body) body.innerHTML = `<tr><td colspan="8"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
+            if (body) body.innerHTML = `<tr><td colspan="9"><div class="result-explanation">${this.formatResponseAsHtml(responseText)}</div></td></tr>`;
             if (statsContainer) statsContainer.innerHTML = '';
         }
     },
